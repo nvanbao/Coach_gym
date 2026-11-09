@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d0f12"><title>Gym Coach</title>
+<style>
+:root{--bg:#0d0f12;--c:#171a1f;--a:#3ddc97;--t:#eee;--m:#9aa3ad}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:15px/1.45 system-ui,sans-serif;padding-bottom:76px}
+main{padding:14px;padding-top:calc(14px + env(safe-area-inset-top));max-width:640px;margin:auto}
+h2{margin:0 0 10px;font-size:20px}h3{margin:0 0 6px;font-size:15px;color:var(--a)}
+.card{background:var(--c);border-radius:12px;padding:12px;margin-bottom:10px}
+label{display:block;font-size:13px;color:var(--m);margin:8px 0 3px}
+input,select,textarea,button{font:inherit;color:var(--t);background:#22262d;border:1px solid #333;border-radius:8px;padding:9px;width:100%}
+button{background:var(--a);color:#000;font-weight:700;border:0;margin-top:6px}button.g{background:#22262d;color:var(--t);border:1px solid #444}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.r3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#12151a;border-top:1px solid #262a31;padding-bottom:env(safe-area-inset-bottom)}
+nav button{background:none;color:var(--m);border-radius:0;padding:12px 2px;font-size:12px;margin:0;border:0}nav button.on{color:var(--a)}
+.big{font-size:26px;font-weight:800}.mut{color:var(--m);font-size:13px}.warn{color:#ffd166;font-size:13px}
+table{width:100%;border-collapse:collapse}td{padding:5px 2px;border-bottom:1px solid #262a31;vertical-align:top}
+canvas{width:100%;border-radius:10px;background:#000}
+</style></head><body>
+<main id="v"></main>
+<nav><button data-t="profile">Hồ sơ</button><button data-t="plan">Kế hoạch</button><button data-t="food">Ăn uống</button><button data-t="cam">Form AI</button><button data-t="log">Nhật ký</button></nav>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
+<script>
+const $ = s => document.querySelector(s), V = $('#v');
+let D = {}; try { D = JSON.parse(localStorage.gym || '{}'); } catch (e) {}
+D.p = D.p || null; D.w = D.w || []; D.s = D.s || []; D.c = D.c || []; D.adj = D.adj || 0; D.ref = D.ref || {};
+const save = () => { try { localStorage.gym = JSON.stringify(D); } catch (e) {} };
+const today = () => new Date().toISOString().slice(0, 10);
+// Hệ số vận động NGOÀI giờ tập theo công việc (đã tách riêng buổi tập)
+const JOBS = [['Văn phòng / kế toán / lập trình (ngồi nhiều)', 1.30], ['Sinh viên (học, ít di chuyển)', 1.35], ['Tài xế (ngồi lái)', 1.35],
+  ['Giáo viên / giảng viên (đứng, đi lại vừa)', 1.45], ['Bán hàng / phục vụ (đứng nhiều)', 1.55], ['Y tá / đầu bếp / chăm sóc', 1.55],
+  ['Shipper / giao hàng', 1.60], ['Công nhân nhà máy / thợ', 1.65], ['Lao động nặng (xây dựng, bốc vác, nông nghiệp)', 1.80]];
+const GOALS = { gain: 'Tăng cơ', lean: 'Săn chắc (giảm mỡ, giữ/tăng cơ)', cut: 'Giảm mỡ', keep: 'Giữ cân' };
+
+function calc(p) {
+  const bmr = p.fat ? 370 + 21.6 * p.w * (1 - p.fat / 100) : 10 * p.w + 6.25 * p.h - 5 * p.age + (p.sex == 'm' ? 5 : -161);
+  const pal = JOBS[p.job][1], tdee = bmr * pal + p.n * 4.5 * p.w / 7; // buổi tập ≈ MET 4.5 × 1 giờ
+  let f = { gain: 1.1, lean: .95, cut: .82, keep: 1 }[p.goal], note = '';
+  if (p.age < 18 && f < 1) f = 1;
+  let t = tdee * f + D.adj;
+  const fl = Math.max(p.sex == 'm' ? 1500 : 1200, bmr * .9);
+  if (t < fl) { t = fl; note = 'Đã nâng lên mức calo tối thiểu an toàn.'; }
+  if (p.goal == 'gain' && t > tdee + 500) t = tdee + 500;
+  const pro = p.w * { gain: 1.8, lean: 2, cut: 2.2, keep: 1.6 }[p.goal], fat = p.w * .9;
+  return { bmr, pal, tdee, t, pro, fat, carb: Math.max(0, (t - pro * 4 - fat * 9) / 4), water: p.w * .035 + .5, note };
+}
+function trend() {
+  const a = D.w.filter(x => x.d >= (D.adjAt || '') && Date.now() - new Date(x.d) < 21 * 864e5);
+  if (a.length < 2) return null;
+  const f = a[0], l = a[a.length - 1], days = (new Date(l.d) - new Date(f.d)) / 864e5;
+  if (days < 6) return null;
+  const r = (l.kg - f.kg) / f.kg * 100 / (days / 7), g = D.p.goal; let d = 0;
+  if (g == 'cut') d = r > -.3 ? -100 : r < -1 ? 150 : 0;
+  else if (g == 'gain') d = r < .1 ? 150 : r > .6 ? -100 : 0;
+  else if (g == 'lean') d = r > .15 ? -100 : r < -.5 ? 100 : 0;
+  else d = r > .3 ? -100 : r < -.3 ? 100 : 0;
+  return { r, d };
+}
+function go(t) {
+  stopCam(); clearInterval(tm);
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t == t));
+  if (!D.p && t != 'profile') t = 'profile';
+  T[t](); window.scrollTo(0, 0);
+}
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => go(b.dataset.t));
+
+// ---------------- Hồ sơ ----------------
+const T = {};
+T.profile = () => {
+  const p = D.p || { sex: 'm', age: 21, h: 170, w: 65, fat: '', job: 0, n: 4, exp: 0, eq: 'gym', goal: 'lean', allergy: '', injury: '', time: '18:00' };
+  V.innerHTML = `<h2>Hồ sơ của bạn</h2><div class=card>
+  <div class=r2><div><label>Giới tính</label><select id=sex><option value=m>Nam<option value=f>Nữ</select></div>
+  <div><label>Tuổi</label><input id=age type=number></div>
+  <div><label>Chiều cao (cm)</label><input id=h type=number></div><div><label>Cân nặng (kg)</label><input id=w type=number step=.1></div></div>
+  <label>% mỡ cơ thể (không bắt buộc, giúp tính chính xác hơn)</label><input id=fat type=number>
+  <label>Công việc (ước lượng vận động ngoài giờ tập)</label><select id=job>${JOBS.map((j, i) => `<option value=${i}>${j[0]}`).join('')}</select>
+  <label>Mục tiêu</label><select id=goal>${Object.entries(GOALS).map(([k, v]) => `<option value=${k}>${v}`).join('')}</select>
+  <div class=r2><div><label>Số buổi tập / tuần</label><select id=n><option>3<option>4<option>5<option>6</select></div>
+  <div><label>Kinh nghiệm</label><select id=exp><option value=0>Mới tập<option value=1>Trung bình<option value=2>Lâu năm</select></div>
+  <div><label>Nơi tập</label><select id=eq><option value=gym>Phòng gym<option value=home>Tại nhà</select></div>
+  <div><label>Giờ tập thường ngày</label><input id=time type=time></div></div>
+  <label>Dị ứng / món không ăn (cách nhau bằng dấu phẩy)</label><input id=allergy placeholder="vd: tôm, đậu phộng, sữa">
+  <label>Chấn thương / vấn đề sức khỏe</label><input id=injury placeholder="vd: đau gối phải">
+  <button onclick="saveP()">Lưu và tạo kế hoạch</button></div>
+  <p class=mut>Ứng dụng chỉ mang tính hỗ trợ, không thay thế huấn luyện viên hoặc bác sĩ. Nếu có chấn thương hay bệnh lý, hãy hỏi chuyên gia trước khi tập. Video camera chỉ xử lý trên máy bạn, không gửi đi đâu.</p>`;
+  Object.keys(p).forEach(k => { const e = $('#' + k); if (e) e.value = p[k] || (k == 'job' || k == 'exp' ? 0 : ''); });
+};
+function saveP() {
+  const g = i => $('#' + i).value;
+  const p = { sex: g('sex'), age: +g('age'), h: +g('h'), w: +g('w'), fat: +g('fat') || 0, job: +g('job'), n: +g('n'), exp: +g('exp'), eq: g('eq'), goal: g('goal'), allergy: g('allergy'), injury: g('injury'), time: g('time') || '18:00' };
+  if (!(p.age >= 14 && p.age <= 80 && p.h >= 120 && p.h <= 230 && p.w >= 35 && p.w <= 200)) { alert('Kiểm tra lại tuổi, chiều cao, cân nặng.'); return; }
+  D.p = p; if (!D.start) D.start = today(); if (!D.w.length) D.w.push({ d: today(), kg: p.w }); save(); go('plan');
+}
+
+// ---------------- Kế hoạch tập ----------------
+const TPL = {
+  push: ['Push (ngực – vai – tay sau)', [['Bench press', 'Hít đất', 'm', 'pushup'], ['Đẩy vai tạ đơn', 'Pike push-up', 'm', 'press'], ['Incline dumbbell press', 'Hít đất tay hẹp', 'a', 'pushup'], ['Tay sau cáp (pushdown)', 'Dips ghế', 'a']]],
+  pull: ['Pull (lưng – tay trước)', [['Lat pulldown', 'Row tạ đơn / ba lô', 'm'], ['Barbell row', 'Row tạ đơn 1 tay', 'm'], ['Face pull', 'Reverse fly tạ đơn', 'a'], ['Curl tạ đòn', 'Curl tạ đơn', 'a']]],
+  leg: ['Legs (chân – mông)', [['Squat', 'Goblet squat', 'm', 'squat'], ['Romanian deadlift', 'RDL tạ đơn', 'm', 'dead'], ['Leg press', 'Lunge', 'a'], ['Gập đùi sau', 'Hip thrust', 'a'], ['Calf raise', 'Calf raise', 'a']]],
+  up: ['Upper (thân trên)', [['Bench press', 'Hít đất', 'm', 'pushup'], ['Lat pulldown', 'Row tạ đơn', 'm'], ['Đẩy vai tạ đơn', 'Pike push-up', 'a', 'press'], ['Curl + tay sau', 'Curl + dips ghế', 'a']]],
+  lo: ['Lower (thân dưới)', [['Squat', 'Goblet squat', 'm', 'squat'], ['Deadlift', 'RDL tạ đơn', 'm', 'dead'], ['Bulgarian split squat', 'Bulgarian split squat', 'a'], ['Calf raise', 'Calf raise', 'a']]],
+  fa: ['Toàn thân A', [['Squat', 'Goblet squat', 'm', 'squat'], ['Bench press', 'Hít đất', 'm', 'pushup'], ['Row tạ đòn', 'Row tạ đơn', 'm'], ['Plank 3x40s', 'Plank 3x40s', 'a']]],
+  fb: ['Toàn thân B', [['Deadlift', 'RDL tạ đơn', 'm', 'dead'], ['Đẩy vai', 'Pike push-up', 'm', 'press'], ['Lat pulldown', 'Row tạ đơn', 'm'], ['Lunge', 'Lunge', 'a']]]
+};
+const SPLIT = { 3: [[0, 'fa'], [2, 'fb'], [4, 'fa']], 4: [[0, 'up'], [1, 'lo'], [3, 'up'], [4, 'lo']], 5: [[0, 'push'], [1, 'pull'], [2, 'leg'], [3, 'up'], [4, 'lo']], 6: [[0, 'push'], [1, 'pull'], [2, 'leg'], [3, 'push'], [4, 'pull'], [5, 'leg']] };
+const RX = { gain: ['4x6-10', '3x10-12'], lean: ['3x8-12', '3x10-15'], cut: ['3x10-12', '3x12-15'], keep: ['3x8-12', '3x10-12'] };
+T.plan = () => {
+  const p = D.p, c = calc(p), wk = Math.floor((Date.now() - new Date(D.start)) / 6048e5) + 1, ph = (wk - 1) % 4 + 1, dl = ph == 4, tr = trend();
+  let h = `<h2>Kế hoạch – Tuần ${wk}</h2><div class=card><div class=r2><div><div class=mut>Tiêu hao / ngày (TDEE)</div><div class=big>${Math.round(c.tdee)}</div></div>
+  <div><div class=mut>Nên ăn / ngày (kcal)</div><div class=big style="color:var(--a)">${Math.round(c.t)}</div></div></div>
+  <p class=mut>BMR ${Math.round(c.bmr)} · công việc ×${c.pal} · đạm ${Math.round(c.pro)}g · tinh bột ${Math.round(c.carb)}g · béo ${Math.round(c.fat)}g · nước ${c.water.toFixed(1)}L (+0,5L ngày tập)</p>
+  ${c.note ? `<p class=warn>${c.note}</p>` : ''}${p.age < 18 ? '<p class=warn>Dưới 18 tuổi: không nên cắt calo, hãy hỏi huấn luyện viên hoặc bác sĩ.</p>' : ''}${p.injury ? `<p class=warn>Lưu ý chấn thương: ${p.injury}. Bỏ hoặc giảm bài gây đau.</p>` : ''}</div>`;
+  h += `<div class=card><h3>${dl ? 'Tuần nhẹ (deload)' : 'Tuần tăng tiến ' + ph + '/3'}</h3><p class=mut style="margin:0">${dl ? 'Giảm 1 set mỗi bài, dùng khoảng 60% tạ để cơ phục hồi.' : 'Mỗi bài thêm 1 rep mỗi set hoặc tăng ~2,5% tạ so với tuần trước. Nghỉ 60–120 giây giữa set.'}</p></div>`;
+  if (tr) h += `<div class=card><h3>Theo dõi cân nặng</h3><p style="margin:0">Cân nặng đang đổi ${tr.r > 0 ? '+' : ''}${tr.r.toFixed(2)}%/tuần. ${tr.d ? `Đề xuất ${tr.d > 0 ? 'tăng' : 'giảm'} ${Math.abs(tr.d)} kcal/ngày.</p><button onclick="D.adj=Math.max(-400,Math.min(400,D.adj+(${tr.d})));D.adjAt=today();save();T.plan()">Áp dụng</button>` : 'Đang đúng hướng, giữ nguyên.</p>'}</div>`;
+  const sess = {}; (SPLIT[p.n] || SPLIT[4]).forEach(([d, k]) => sess[d] = p.n == 3 && wk % 2 == 0 ? (k == 'fa' ? 'fb' : 'fa') : k);
+  ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].forEach((nm, i) => {
+    const k = sess[i];
+    if (!k) { h += `<div class=card><h3>${nm} · Nghỉ</h3><span class=mut>Đi bộ nhẹ 30 phút, giãn cơ, ngủ đủ 7–9 tiếng.</span></div>`; return; }
+    const [title, ex] = TPL[k];
+    h += `<div class=card><h3>${nm} · ${title}</h3><table>${ex.slice(0, p.exp == 0 ? 3 : 9).map(e => {
+      const r = e[0].startsWith('Plank') ? '' : RX[p.goal][e[2] == 'm' ? 0 : 1].replace(/^\d/, x => dl ? x - 1 : x) + (dl ? ' nhẹ' : '');
+      return `<tr><td>${p.eq == 'gym' ? e[0] : e[1]}${e[3] ? ' 📷' : ''}</td><td align=right>${r}</td></tr>`;
+    }).join('')}</table><span class=mut>Khởi động 5–8 phút + 2 set nhẹ bài đầu.${p.goal == 'cut' || p.goal == 'lean' ? ' Cardio nhẹ 15–20 phút sau tập.' : ''}</span></div>`;
+  });
+  V.innerHTML = h + `<p class=mut>📷 = bài có thể kiểm tra form bằng camera ở tab "Form AI".</p><button class=g onclick="if(confirm('Bắt đầu chu kỳ mới từ tuần 1?')){D.start=today();save();T.plan()}">Bắt đầu chu kỳ mới</button>
+  <button class=g onclick="T.profile()">Sửa hồ sơ</button>`;
+};
+
+// ---------------- Ăn uống ----------------
+const F = { // kcal, đạm, tinh bột, béo / 100g
+  'Cơm trắng': [130, 2.7, 28, .3], 'Khoai lang luộc': [86, 1.6, 20, .1], 'Yến mạch (khô)': [380, 13, 66, 7], 'Bánh mì': [265, 9, 49, 3.2], 'Chuối': [89, 1.1, 23, .3],
+  'Ức gà luộc': [165, 31, 0, 3.6], 'Thịt bò nạc': [180, 26, 0, 8], 'Cá thu / cá basa': [160, 19, 0, 9], 'Trứng gà': [143, 12.6, .7, 9.5], 'Đậu hũ': [76, 8, 2, 4.8],
+  'Sữa chua Hy Lạp': [59, 10, 3.6, .4], 'Rau xanh luộc': [25, 2, 4, .3], 'Hạt / đậu phộng': [580, 25, 16, 48]
+};
+T.food = () => {
+  const p = D.p, c = calc(p), [hr, mn] = p.time.split(':').map(Number), tt = hr + mn / 60;
+  const bn = p.allergy.toLowerCase().split(/[,;]/).map(s => s.trim()).filter(Boolean), ok = n => !bn.some(b => n.toLowerCase().includes(b)), pick = l => l.find(ok);
+  const hh = x => { x = (x % 24 + 24) % 24; return String(Math.floor(x)).padStart(2, '0') + ':' + String(Math.floor(x % 1 * 60)).padStart(2, '0'); };
+  const M = [['Sáng', 7, .22, ['Trứng gà', 'Sữa chua Hy Lạp', 'Đậu hũ'], ['Yến mạch (khô)', 'Bánh mì', 'Chuối']],
+    ['Trưa', 12, .28, ['Ức gà luộc', 'Thịt bò nạc', 'Cá thu / cá basa', 'Đậu hũ'], ['Cơm trắng', 'Khoai lang luộc'], 1],
+    ['Trước tập (1–2 giờ trước, ít béo, dễ tiêu)', tt - 1.5, .15, ['Sữa chua Hy Lạp', 'Trứng gà'], ['Chuối', 'Bánh mì', 'Khoai lang luộc']],
+    ['Sau tập (trong 1–2 giờ: đạm + tinh bột)', tt + 1, .25, ['Ức gà luộc', 'Cá thu / cá basa', 'Thịt bò nạc', 'Đậu hũ'], ['Cơm trắng', 'Khoai lang luộc'], 1],
+    ['Phụ trước ngủ', 22, .10, ['Sữa chua Hy Lạp', 'Trứng gà'], ['Hạt / đậu phộng']]].sort((a, b) => (a[1] + 24) % 24 - (b[1] + 24) % 24);
+  const tot = [0, 0, 0, 0];
+  const rows = M.map(m => {
+    const it = []; let k = 0;
+    const add = (n, g) => { const f = F[n]; k += f[0] * g / 100; [0, 1, 2, 3].forEach(i => tot[i] += f[i] * g / 100); it.push(n == 'Trứng gà' ? `${g / 50} quả trứng` : `${n} ${g}g`); };
+    const pf = pick(m[3]), cf = pick(m[4]);
+    if (pf) { let g = m[2] * c.pro / (F[pf][1] / 100); g = pf == 'Trứng gà' ? Math.max(1, Math.min(3, Math.round(g / 50))) * 50 : Math.round(Math.min(g, 400) / 5) * 5; add(pf, g); }
+    if (m[5]) add('Rau xanh luộc', 100);
+    if (cf) { let g = (m[2] * c.t - k) / (F[cf][0] / 100); g = Math.round(Math.max(0, Math.min(g, cf == 'Hạt / đậu phộng' ? 30 : 500)) / 5) * 5; if (g) add(cf, g); }
+    return `<div class=card><h3>${hh(m[1])} · ${m[0]}</h3>${it.length ? it.join('<br>') : '<span class=mut>Tự chọn món phù hợp với dị ứng của bạn.</span>'}</div>`;
+  }).join('');
+  V.innerHTML = `<h2>Thực đơn 1 ngày</h2><div class=card>Mục tiêu: <b>${Math.round(c.t)} kcal</b> · đạm ${Math.round(c.pro)}g<br>
+  Thực đơn dưới đây ≈ <b>${Math.round(tot[0])} kcal</b> · đạm ${Math.round(tot[1])}g · tinh bột ${Math.round(tot[2])}g · béo ${Math.round(tot[3])}g<br>
+  <span class=mut>Giờ tập: ${p.time}. Uống ${c.water.toFixed(1)}L nước/ngày. Phần thiếu có thể bù bằng dầu ăn, trái cây hoặc rau. Lượng tính theo thực phẩm chín (trừ yến mạch khô).</span></div>${rows}
+  <p class=mut>Nếu ăn trước tập quá sát giờ (dưới 45 phút), chọn phần nhỏ như chuối. Dị ứng đã loại: ${bn.join(', ') || 'không có'}.</p>`;
+};
+
+// ---------------- Camera kiểm tra form ----------------
+const A = (a, b, c) => { const x = a.x - b.x, y = a.y - b.y, u = c.x - b.x, v = c.y - b.y; return Math.acos(Math.max(-1, Math.min(1, (x * u + y * v) / (Math.hypot(x, y) * Math.hypot(u, v) || 1)))) * 180 / Math.PI; };
+const lean = (s, h) => Math.atan2(Math.abs(s.x - h.x), Math.abs(s.y - h.y)) * 180 / Math.PI;
+// Ngưỡng góc dựa trên chuẩn sinh cơ học; có thể ghi đè bằng "rep mẫu" của PT (D.ref)
+const CAM = {
+  squat: { n: 'Squat', tip: 'Quay NGANG người, thấy cả thân từ vai tới cổ chân.', need: ['s', 'h', 'k', 'a'], main: P => A(P.h, P.k, P.a), dn: 125, up: 160,
+    chk: (P, m) => m < 140 && lean(P.s, P.h) > 65 ? ['Lưng gập quá nhiều, ưỡn ngực lên'] : [],
+    end: (mn, mx, r) => [mn > (r ? r.min + 10 : 105) && 'Xuống sâu hơn, đùi song song sàn', mx < (r ? r.max - 10 : 155) && 'Đứng thẳng hết ở trên'].filter(Boolean) },
+  pushup: { n: 'Hít đất', tip: 'Quay NGANG người, camera đặt thấp ngang thân.', need: ['s', 'e', 'w', 'h', 'a'], main: P => A(P.s, P.e, P.w), dn: 110, up: 150,
+    chk: P => A(P.s, P.h, P.a) < 155 ? ['Giữ thân thẳng, siết bụng và mông'] : [],
+    end: (mn, mx, r) => [mn > (r ? r.min + 10 : 95) && 'Hạ ngực thấp hơn', mx < (r ? r.max - 10 : 155) && 'Duỗi thẳng tay ở trên'].filter(Boolean) },
+  dead: { n: 'Deadlift / RDL', tip: 'Quay NGANG người, thấy cả thân và chân.', need: ['s', 'h', 'k', 'a'], main: P => A(P.s, P.h, P.k), dn: 135, up: 165,
+    chk: (P, m) => m < 145 && A(P.h, P.k, P.a) < 120 ? ['Đừng gập gối nhiều, đẩy hông ra sau'] : [],
+    end: (mn, mx, r) => [mx < (r ? r.max - 8 : 168) && 'Duỗi hông, đứng thẳng hết ở trên'].filter(Boolean) },
+  press: { n: 'Đẩy vai', tip: 'Quay NGANG hoặc chéo 45°, thấy rõ tay và thân.', need: ['s', 'e', 'w', 'h'], main: P => A(P.s, P.e, P.w), dn: 100, up: 155,
+    chk: (P, m) => m > 110 && lean(P.s, P.h) > 15 ? ['Đừng ưỡn lưng, siết bụng và mông'] : [],
+    end: (mn, mx, r) => [mx < (r ? r.max - 8 : 158) && 'Đẩy thẳng tay lên hết'].filter(Boolean) }
+};
+let det, blaze = true, stream, run = false, facing = 'environment', cc, cx, st = null, calib = false, msg = '', fbT = '', fbAt = 0, lastSay = 0, sm = null;
+const vid = document.createElement('video');
+T.cam = () => {
+  V.innerHTML = `<h2>Kiểm tra form bằng camera</h2><div class=card><label>Bài tập</label><select id=ex onchange="st=null;sm=null;info()">${Object.entries(CAM).map(([k, v]) => `<option value=${k}>${v.n}`).join('')}</select>
+  <p class=mut id=tip style="margin:6px 0 0"></p><label style="display:flex;gap:8px;align-items:center"><input type=checkbox id=snd checked style="width:auto"> Cảnh báo bằng giọng nói</label></div>
+  <canvas id=cv width=640 height=480></canvas><p class=warn id=cm></p><div class=r2><button onclick="startCam()">Bật camera</button><button class=g onclick="flip()">Đổi camera trước/sau</button>
+  <button class=g onclick="calib=true;say('Thực hiện 1 rep chuẩn')">Lưu rep mẫu (PT)</button><button class=g onclick="endSess()">Kết thúc và lưu</button></div>
+  <div class=card id=cs style="margin-top:10px">Chưa có rep nào.</div>
+  <p class=mut>Đặt điện thoại cố định, cách người 2–3 m, đủ sáng. Rep mẫu: nhờ PT hoặc người tập đúng thực hiện 1 rep, app dùng biên độ góc đó làm chuẩn cho bạn. Camera 2D chỉ ước lượng góc nên có thể sai khi bị che khuất.</p>`;
+  cc = $('#cv'); cx = cc.getContext('2d'); info();
+};
+function info() { const k = $('#ex').value, r = D.ref[k]; $('#tip').textContent = CAM[k].tip + (r ? ` (Đang dùng rep mẫu: góc ${Math.round(r.min)}°–${Math.round(r.max)}°)` : ''); }
+async function startCam() {
+  if (run) return; const m = $('#cm'); m.textContent = 'Đang tải mô hình AI…';
+  try {
+    if (!det) {
+      try { det = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { runtime: 'tfjs', modelType: 'lite' }); blaze = true; }
+      catch (e) { det = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, { modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING }); blaze = false; }
+    }
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    vid.srcObject = stream; vid.playsInline = true; vid.muted = true; await vid.play();
+    cc.width = vid.videoWidth; cc.height = vid.videoHeight; run = true; m.textContent = ''; try { await navigator.wakeLock.request('screen'); } catch (e) {}
+    camLoop();
+  } catch (e) { m.textContent = 'Lỗi: ' + e.message + ' (cần HTTPS và cấp quyền camera)'; }
+}
+function stopCam() { run = false; if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; }
+function flip() { facing = facing == 'environment' ? 'user' : 'environment'; stopCam(); startCam(); }
+async function camLoop() {
+  if (!run) return;
+  if (vid.readyState > 1) {
+    try { const ps = await det.estimatePoses(vid); cx.drawImage(vid, 0, 0, cc.width, cc.height); ps[0] ? proc(ps[0]) : msg = 'Không thấy người'; hud(); } catch (e) {}
+  }
+  requestAnimationFrame(camLoop);
+}
+function say(t) {
+  fbT = t; fbAt = Date.now(); const s = $('#snd');
+  if (!s || !s.checked || Date.now() - lastSay < 2500) return; lastSay = Date.now();
+  try { const u = new SpeechSynthesisUtterance(t); u.lang = 'vi-VN'; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {}
+}
+let pts = null, bad = false;
+function proc(po) {
+  const K = po.keypoints, key = $('#ex').value, E = CAM[key], I = blaze ? { s: 11, e: 13, w: 15, h: 23, k: 25, a: 27 } : { s: 5, e: 7, w: 9, h: 11, k: 13, a: 15 };
+  const avg = d => Object.values(I).reduce((s, i) => s + K[i + d].score, 0) / 6, d = avg(0) >= avg(1) ? 0 : 1, P = {};
+  for (const n in I) P[n] = K[I[n] + d];
+  pts = P; bad = false;
+  if (!E.need.every(n => P[n].score > .4)) { msg = 'Đứng lùi để thấy rõ cơ thể (quay ngang)'; return; }
+  msg = '';
+  if (!st) st = { act: false, dn: false, min: 999, max: 0, iss: {}, said: {}, reps: [] };
+  const m = E.main(P); sm = sm == null ? m : sm * .6 + m * .4; st.cur = sm;
+  if (sm < E.up) {
+    st.act = true; st.min = Math.min(st.min, sm); st.max = Math.max(st.max, sm); if (sm < E.dn) st.dn = true;
+    E.chk(P, sm).forEach(i => { st.iss[i] = (st.iss[i] || 0) + 1; bad = true; if (st.iss[i] == 6 && !st.said[i]) { st.said[i] = 1; say(i); } });
+  } else if (st.act) {
+    st.max = Math.max(st.max, sm);
+    if (st.dn) finishRep(key, E);
+    st.act = false; st.dn = false; st.min = 999; st.max = 0; st.iss = {}; st.said = {};
+  }
+}
+function finishRep(key, E) {
+  const all = Object.keys(st.iss).filter(i => st.iss[i] >= 4).concat(E.end(st.min, st.max, D.ref[key]));
+  if (calib) { D.ref[key] = { min: st.min, max: st.max }; save(); calib = false; info(); say('Đã lưu rep mẫu'); return; }
+  st.reps.push({ s: Math.max(0, 100 - 25 * all.length), f: all }); say(all[0] || 'Tốt lắm');
+  const a = Math.round(st.reps.reduce((x, r) => x + r.s, 0) / st.reps.length);
+  $('#cs').innerHTML = `<b>${st.reps.length} rep</b> · điểm form TB <b>${a}</b>/100<br><span class=mut>` + st.reps.slice(-5).map((r, i) => `Rep ${st.reps.length - Math.min(5, st.reps.length) + i + 1}: ${r.s}đ${r.f.length ? ' – ' + r.f.join('; ') : ''}`).join('<br>') + '</span>';
+}
+function hud() {
+  const S = cc.width / 640;
+  if (pts) {
+    cx.strokeStyle = bad ? '#ff5a5a' : '#3ddc97'; cx.lineWidth = 4 * S; cx.beginPath();
+    [['s', 'e'], ['e', 'w'], ['s', 'h'], ['h', 'k'], ['k', 'a']].forEach(([a, b]) => { cx.moveTo(pts[a].x, pts[a].y); cx.lineTo(pts[b].x, pts[b].y); }); cx.stroke();
+    cx.fillStyle = '#fff'; Object.values(pts).forEach(q => { cx.beginPath(); cx.arc(q.x, q.y, 5 * S, 0, 7); cx.fill(); });
+  }
+  cx.font = `bold ${22 * S}px sans-serif`; cx.fillStyle = 'rgba(0,0,0,.6)'; cx.fillRect(0, 0, cc.width, 40 * S);
+  cx.fillStyle = '#f5c542'; cx.fillText(CAM[$('#ex').value].n + ' · Rep ' + (st ? st.reps.length : 0) + (st && st.cur ? ' · ' + Math.round(st.cur) + '°' : ''), 10 * S, 28 * S);
+  const t = msg || (Date.now() - fbAt < 3000 ? fbT : '');
+  if (t) { cx.fillStyle = 'rgba(0,0,0,.7)'; cx.fillRect(0, cc.height - 50 * S, cc.width, 50 * S); cx.fillStyle = bad || msg ? '#ffd166' : '#3ddc97'; cx.fillText(t, 10 * S, cc.height - 17 * S); }
+}
+function endSess() {
+  if (!st || !st.reps.length) { alert('Chưa có rep nào để lưu.'); return; }
+  const a = Math.round(st.reps.reduce((x, r) => x + r.s, 0) / st.reps.length), cnt = {};
+  st.reps.forEach(r => r.f.forEach(f => cnt[f] = (cnt[f] || 0) + 1));
+  D.c.push({ d: today(), ex: $('#ex').value, n: st.reps.length, avg: a, top: Object.entries(cnt).sort((x, y) => y[1] - x[1])[0]?.[0] || '' }); save();
+  $('#cs').innerHTML = `Đã lưu: ${st.reps.length} rep, điểm TB ${a}/100.` + (Object.keys(cnt).length ? '<br>Lỗi hay gặp: ' + Object.entries(cnt).sort((x, y) => y[1] - x[1]).map(e => `${e[0]} (${e[1]} rep)`).join('; ') : ''); st = null; sm = null;
+}
+
+// ---------------- Nhật ký ----------------
+let tm;
+const beep = () => { try { const a = new AudioContext(), o = a.createOscillator(); o.connect(a.destination); o.start(); setTimeout(() => { o.stop(); a.close(); }, 400); navigator.vibrate && navigator.vibrate(300); } catch (e) {} };
+function rest(s) { clearInterval(tm); let t = s; const el = $('#tm'); tm = setInterval(() => { el.textContent = t > 0 ? `Nghỉ: ${t--}s` : (clearInterval(tm), beep(), 'Hết giờ nghỉ!'); }, 1000); }
+function addW() { const kg = +$('#kg').value; if (!kg) return; D.w.push({ d: today(), kg, wa: +$('#wa').value || 0 }); D.w.sort((a, b) => a.d < b.d ? -1 : 1); D.p.w = kg; save(); T.log(); }
+function addS() { const kg = +$('#sk').value, r = +$('#sr').value, ex = $('#se').value.trim(); if (!ex || !r) return; D.s.push({ d: today(), ex, kg, r }); save(); T.log(); }
+T.log = () => {
+  const ts = D.s.filter(x => x.d == today()), ws = D.w.slice(-5).reverse();
+  V.innerHTML = `<h2>Nhật ký</h2><div class=card><h3>Cân nặng</h3><canvas id=ch width=600 height=160></canvas>
+  <div class=r3><input id=kg type=number step=.1 placeholder="Cân nặng kg"><input id=wa type=number placeholder="Eo cm (tùy chọn)"><button onclick="addW()" style="margin:0">Thêm</button></div>
+  <table>${ws.map(x => `<tr><td>${x.d}</td><td>${x.kg} kg</td><td>${x.wa ? 'eo ' + x.wa : ''}</td></tr>`).join('')}</table></div>
+  <div class=card><h3>Set hôm nay</h3><div class=r3><input id=se placeholder="Bài tập" list=el><input id=sk type=number step=.5 placeholder="Tạ (kg)"><input id=sr type=number placeholder="Số rep"></div>
+  <datalist id=el>${[...new Set(Object.values(TPL).flatMap(t => t[1].map(e => D.p.eq == 'gym' ? e[0] : e[1])))].map(x => `<option>${x}`).join('')}</datalist>
+  <button onclick="addS()">Thêm set</button><table>${ts.map(x => `<tr><td>${x.ex}</td><td>${x.kg} kg × ${x.r}</td></tr>`).join('')}</table>
+  <div class=r3><button class=g onclick="rest(60)">Nghỉ 60s</button><button class=g onclick="rest(90)">Nghỉ 90s</button><button class=g onclick="rest(120)">Nghỉ 120s</button></div><p class=big id=tm style="margin:8px 0 0"></p></div>
+  <div class=card><h3>Buổi kiểm tra form gần đây</h3><table>${D.c.slice(-5).reverse().map(x => `<tr><td>${x.d}</td><td>${CAM[x.ex].n}</td><td>${x.n} rep · ${x.avg}đ</td></tr>`).join('') || '<tr><td class=mut>Chưa có.</td></tr>'}</table></div>`;
+  const w = D.w.slice(-30); if (w.length < 2) return;
+  const c = $('#ch').getContext('2d'), mn = Math.min(...w.map(x => x.kg)) - 1, mx = Math.max(...w.map(x => x.kg)) + 1;
+  c.strokeStyle = '#3ddc97'; c.lineWidth = 3; c.beginPath();
+  w.forEach((x, i) => { const X = 20 + i * 560 / (w.length - 1), Y = 140 - (x.kg - mn) / (mx - mn) * 120; i ? c.lineTo(X, Y) : c.moveTo(X, Y); }); c.stroke();
+  c.fillStyle = '#aaa'; c.font = '14px sans-serif'; c.fillText(mx.toFixed(1), 2, 14); c.fillText(mn.toFixed(1), 2, 158);
+};
+go(D.p ? 'plan' : 'profile');
+</script></body></html>
