@@ -17,11 +17,14 @@ nav button{background:none;color:var(--m);border-radius:0;padding:12px 2px;font-
 .big{font-size:26px;font-weight:800}.mut{color:var(--m);font-size:13px}.warn{color:#ffd166;font-size:13px}
 table{width:100%;border-collapse:collapse}td{padding:5px 2px;border-bottom:1px solid #262a31;vertical-align:top}
 canvas{width:100%;border-radius:10px;background:#000}
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9;overflow:auto;padding:14px}.mo .box{max-width:640px;margin:0 auto}
+.dm{width:100%;height:260px;border-radius:12px;display:block;touch-action:none}.ex{cursor:pointer;border-bottom:1px dotted var(--a)}
 </style></head><body>
 <main id="v"></main>
 <nav><button data-t="profile">Hồ sơ</button><button data-t="plan">Kế hoạch</button><button data-t="food">Ăn uống</button><button data-t="cam">Form AI</button><button data-t="log">Nhật ký</button></nav>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 const $ = s => document.querySelector(s), V = $('#v');
 let D = {}; try { D = JSON.parse(localStorage.gym || '{}'); } catch (e) {}
@@ -31,7 +34,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 // Hệ số vận động NGOÀI giờ tập theo công việc (đã tách riêng buổi tập)
 const JOBS = [['Văn phòng / kế toán / lập trình (ngồi nhiều)', 1.30], ['Sinh viên (học, ít di chuyển)', 1.35], ['Tài xế (ngồi lái)', 1.35],
   ['Giáo viên / giảng viên (đứng, đi lại vừa)', 1.45], ['Bán hàng / phục vụ (đứng nhiều)', 1.55], ['Y tá / đầu bếp / chăm sóc', 1.55],
-  ['Shipper / giao hàng', 1.60], ['Công nhân nhà máy / thợ', 1.65], ['Lao động nặng (xây dựng, bốc vác, nông nghiệp)', 1.80]];
+  ['Shipper / giao hàng', 1.60], ['Công nhân nhà máy / thợ', 1.65], ['Lao động nặng (xây dựng, bốc vác, nông nghiệp)', 1.80], ['Học sinh (đi học, ít vận động)', 1.40]];
 const GOALS = { gain: 'Tăng cơ', lean: 'Săn chắc (giảm mỡ, giữ/tăng cơ)', cut: 'Giảm mỡ', keep: 'Giữ cân' };
 
 function calc(p) {
@@ -59,7 +62,7 @@ function trend() {
   return { r, d };
 }
 function go(t) {
-  stopCam(); clearInterval(tm);
+  stopCam(); closeDemo(); clearInterval(tm);
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t == t));
   if (!D.p && t != 'profile') t = 'profile';
   T[t](); window.scrollTo(0, 0);
@@ -69,7 +72,7 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => go(b.data
 // ---------------- Hồ sơ ----------------
 const T = {};
 T.profile = () => {
-  const p = D.p || { sex: 'm', age: 21, h: 170, w: 65, fat: '', job: 0, n: 4, exp: 0, eq: 'gym', goal: 'lean', allergy: '', injury: '', time: '18:00' };
+  const p = Object.assign({ bud: 'mid', cap: '' }, D.p || { sex: 'm', age: 21, h: 170, w: 65, fat: '', job: 0, n: 4, exp: 0, eq: 'gym', goal: 'lean', allergy: '', injury: '', time: '18:00' });
   V.innerHTML = `<h2>Hồ sơ của bạn</h2><div class=card>
   <div class=r2><div><label>Giới tính</label><select id=sex><option value=m>Nam<option value=f>Nữ</select></div>
   <div><label>Tuổi</label><input id=age type=number></div>
@@ -81,6 +84,8 @@ T.profile = () => {
   <div><label>Kinh nghiệm</label><select id=exp><option value=0>Mới tập<option value=1>Trung bình<option value=2>Lâu năm</select></div>
   <div><label>Nơi tập</label><select id=eq><option value=gym>Phòng gym<option value=home>Tại nhà</select></div>
   <div><label>Giờ tập thường ngày</label><input id=time type=time></div></div>
+  <label>Ngân sách đầu tư cho tập luyện và ăn uống</label><select id=bud><option value=sv>Học sinh / sinh viên (tiết kiệm)<option value=mid>Cơ bản (cân bằng)<option value=inv>Đầu tư nghiêm túc (người đi làm, chi nhiều hơn)</select>
+  <label>Ngân sách ăn uống mỗi ngày (nghìn đồng, tùy chọn)</label><input id=cap type=number placeholder="vd: 60">
   <label>Dị ứng / món không ăn (cách nhau bằng dấu phẩy)</label><input id=allergy placeholder="vd: tôm, đậu phộng, sữa">
   <label>Chấn thương / vấn đề sức khỏe</label><input id=injury placeholder="vd: đau gối phải">
   <button onclick="saveP()">Lưu và tạo kế hoạch</button></div>
@@ -89,7 +94,7 @@ T.profile = () => {
 };
 function saveP() {
   const g = i => $('#' + i).value;
-  const p = { sex: g('sex'), age: +g('age'), h: +g('h'), w: +g('w'), fat: +g('fat') || 0, job: +g('job'), n: +g('n'), exp: +g('exp'), eq: g('eq'), goal: g('goal'), allergy: g('allergy'), injury: g('injury'), time: g('time') || '18:00' };
+  const p = { sex: g('sex'), age: +g('age'), h: +g('h'), w: +g('w'), fat: +g('fat') || 0, job: +g('job'), n: +g('n'), exp: +g('exp'), eq: g('eq'), goal: g('goal'), allergy: g('allergy'), injury: g('injury'), time: g('time') || '18:00', bud: g('bud') || 'mid', cap: +g('cap') || 0 };
   if (!(p.age >= 14 && p.age <= 80 && p.h >= 120 && p.h <= 230 && p.w >= 35 && p.w <= 200)) { alert('Kiểm tra lại tuổi, chiều cao, cân nặng.'); return; }
   D.p = p; if (!D.start) D.start = today(); if (!D.w.length) D.w.push({ d: today(), kg: p.w }); save(); go('plan');
 }
@@ -113,18 +118,19 @@ T.plan = () => {
   <p class=mut>BMR ${Math.round(c.bmr)} · công việc ×${c.pal} · đạm ${Math.round(c.pro)}g · tinh bột ${Math.round(c.carb)}g · béo ${Math.round(c.fat)}g · nước ${c.water.toFixed(1)}L (+0,5L ngày tập)</p>
   ${c.note ? `<p class=warn>${c.note}</p>` : ''}${p.age < 18 ? '<p class=warn>Dưới 18 tuổi: không nên cắt calo, hãy hỏi huấn luyện viên hoặc bác sĩ.</p>' : ''}${p.injury ? `<p class=warn>Lưu ý chấn thương: ${p.injury}. Bỏ hoặc giảm bài gây đau.</p>` : ''}</div>`;
   h += `<div class=card><h3>${dl ? 'Tuần nhẹ (deload)' : 'Tuần tăng tiến ' + ph + '/3'}</h3><p class=mut style="margin:0">${dl ? 'Giảm 1 set mỗi bài, dùng khoảng 60% tạ để cơ phục hồi.' : 'Mỗi bài thêm 1 rep mỗi set hoặc tăng ~2,5% tạ so với tuần trước. Nghỉ 60–120 giây giữa set.'}</p></div>`;
+  h += `<div class=card><h3>Ngân sách</h3><p class=mut style="margin:0">${BTIP[p.bud || 'mid']}</p></div>`;
   if (tr) h += `<div class=card><h3>Theo dõi cân nặng</h3><p style="margin:0">Cân nặng đang đổi ${tr.r > 0 ? '+' : ''}${tr.r.toFixed(2)}%/tuần. ${tr.d ? `Đề xuất ${tr.d > 0 ? 'tăng' : 'giảm'} ${Math.abs(tr.d)} kcal/ngày.</p><button onclick="D.adj=Math.max(-400,Math.min(400,D.adj+(${tr.d})));D.adjAt=today();save();T.plan()">Áp dụng</button>` : 'Đang đúng hướng, giữ nguyên.</p>'}</div>`;
-  const sess = {}; (SPLIT[p.n] || SPLIT[4]).forEach(([d, k]) => sess[d] = p.n == 3 && wk % 2 == 0 ? (k == 'fa' ? 'fb' : 'fa') : k);
+  const sess = weekSess(p, wk), tdi = (new Date().getDay() + 6) % 7;
   ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].forEach((nm, i) => {
     const k = sess[i];
     if (!k) { h += `<div class=card><h3>${nm} · Nghỉ</h3><span class=mut>Đi bộ nhẹ 30 phút, giãn cơ, ngủ đủ 7–9 tiếng.</span></div>`; return; }
     const [title, ex] = TPL[k];
-    h += `<div class=card><h3>${nm} · ${title}</h3><table>${ex.slice(0, p.exp == 0 ? 3 : 9).map(e => {
+    h += `<div class=card${i == tdi ? ' style="outline:1px solid var(--a)"' : ''}><h3>${nm}${i == tdi ? ' (hôm nay)' : ''} · ${title}</h3><table>${ex.slice(0, p.exp == 0 ? 3 : 9).map(e => {
       const r = e[0].startsWith('Plank') ? '' : RX[p.goal][e[2] == 'm' ? 0 : 1].replace(/^\d/, x => dl ? x - 1 : x) + (dl ? ' nhẹ' : '');
-      return `<tr><td>${p.eq == 'gym' ? e[0] : e[1]}${e[3] ? ' 📷' : ''}</td><td align=right>${r}</td></tr>`;
+      return `<tr><td><span class=ex onclick="demo(this.textContent)">${en(e)}</span>${camOf(en(e)) ? ' 📷' : ''}</td><td align=right>${r}</td></tr>`;
     }).join('')}</table><span class=mut>Khởi động 5–8 phút + 2 set nhẹ bài đầu.${p.goal == 'cut' || p.goal == 'lean' ? ' Cardio nhẹ 15–20 phút sau tập.' : ''}</span></div>`;
   });
-  V.innerHTML = h + `<p class=mut>📷 = bài có thể kiểm tra form bằng camera ở tab "Form AI".</p><button class=g onclick="if(confirm('Bắt đầu chu kỳ mới từ tuần 1?')){D.start=today();save();T.plan()}">Bắt đầu chu kỳ mới</button>
+  V.innerHTML = h + `<p class=mut>Bấm tên bài để xem minh họa 3D. 📷 = bài kiểm tra form bằng camera ở tab "Form AI" (theo đúng buổi tập).</p><button class=g onclick="if(confirm('Bắt đầu chu kỳ mới từ tuần 1?')){D.start=today();save();T.plan()}">Bắt đầu chu kỳ mới</button>
   <button class=g onclick="T.profile()">Sửa hồ sơ</button>`;
 };
 
@@ -132,22 +138,22 @@ T.plan = () => {
 const F = { // kcal, đạm, tinh bột, béo / 100g
   'Cơm trắng': [130, 2.7, 28, .3], 'Khoai lang luộc': [86, 1.6, 20, .1], 'Yến mạch (khô)': [380, 13, 66, 7], 'Bánh mì': [265, 9, 49, 3.2], 'Chuối': [89, 1.1, 23, .3],
   'Ức gà luộc': [165, 31, 0, 3.6], 'Thịt bò nạc': [180, 26, 0, 8], 'Cá thu / cá basa': [160, 19, 0, 9], 'Trứng gà': [143, 12.6, .7, 9.5], 'Đậu hũ': [76, 8, 2, 4.8],
-  'Sữa chua Hy Lạp': [59, 10, 3.6, .4], 'Rau xanh luộc': [25, 2, 4, .3], 'Hạt / đậu phộng': [580, 25, 16, 48]
+  'Sữa chua Hy Lạp': [59, 10, 3.6, .4], 'Rau xanh luộc': [25, 2, 4, .3], 'Hạt / đậu phộng': [580, 25, 16, 48], 'Cá hồi': [208, 20, 0, 13], 'Whey protein': [400, 80, 8, 6]
 };
 T.food = () => {
   const p = D.p, c = calc(p), [hr, mn] = p.time.split(':').map(Number), tt = hr + mn / 60;
-  const bn = p.allergy.toLowerCase().split(/[,;]/).map(s => s.trim()).filter(Boolean), ok = n => !bn.some(b => n.toLowerCase().includes(b)), pick = l => l.find(ok);
+  const bn = p.allergy.toLowerCase().split(/[,;]/).map(s => s.trim()).filter(Boolean), ok = n => !bn.some(b => n.toLowerCase().includes(b)), bd = p.bud || 'mid', NO = ({ sv: PREM, mid: ['Whey protein', 'Cá hồi'], inv: [] })[bd], pick = (l, pr) => { l = l.filter(n => !NO.includes(n)); if (pr && bd == 'sv') l.sort((a, b) => PRICE[a] / F[a][1] - PRICE[b] / F[b][1]); if (pr && bd == 'inv') l.sort((a, b) => PREM.includes(b) - PREM.includes(a)); return l.find(ok); };
   const hh = x => { x = (x % 24 + 24) % 24; return String(Math.floor(x)).padStart(2, '0') + ':' + String(Math.floor(x % 1 * 60)).padStart(2, '0'); };
   const M = [['Sáng', 7, .22, ['Trứng gà', 'Sữa chua Hy Lạp', 'Đậu hũ'], ['Yến mạch (khô)', 'Bánh mì', 'Chuối']],
-    ['Trưa', 12, .28, ['Ức gà luộc', 'Thịt bò nạc', 'Cá thu / cá basa', 'Đậu hũ'], ['Cơm trắng', 'Khoai lang luộc'], 1],
+    ['Trưa', 12, .28, ['Ức gà luộc', 'Thịt bò nạc', 'Cá hồi', 'Cá thu / cá basa', 'Đậu hũ'], ['Cơm trắng', 'Khoai lang luộc'], 1],
     ['Trước tập (1–2 giờ trước, ít béo, dễ tiêu)', tt - 1.5, .15, ['Sữa chua Hy Lạp', 'Trứng gà'], ['Chuối', 'Bánh mì', 'Khoai lang luộc']],
-    ['Sau tập (trong 1–2 giờ: đạm + tinh bột)', tt + 1, .25, ['Ức gà luộc', 'Cá thu / cá basa', 'Thịt bò nạc', 'Đậu hũ'], ['Cơm trắng', 'Khoai lang luộc'], 1],
+    ['Sau tập (trong 1–2 giờ: đạm + tinh bột)', tt + 1, .25, ['Whey protein', 'Ức gà luộc', 'Cá hồi', 'Cá thu / cá basa', 'Thịt bò nạc', 'Đậu hũ'], ['Cơm trắng', 'Khoai lang luộc'], 1],
     ['Phụ trước ngủ', 22, .10, ['Sữa chua Hy Lạp', 'Trứng gà'], ['Hạt / đậu phộng']]].sort((a, b) => (a[1] + 24) % 24 - (b[1] + 24) % 24);
-  const tot = [0, 0, 0, 0];
+  const tot = [0, 0, 0, 0]; let cost = 0;
   const rows = M.map(m => {
     const it = []; let k = 0;
-    const add = (n, g) => { const f = F[n]; k += f[0] * g / 100; [0, 1, 2, 3].forEach(i => tot[i] += f[i] * g / 100); it.push(n == 'Trứng gà' ? `${g / 50} quả trứng` : `${n} ${g}g`); };
-    const pf = pick(m[3]), cf = pick(m[4]);
+    const add = (n, g) => { const f = F[n]; cost += PRICE[n] * g / 100; k += f[0] * g / 100; [0, 1, 2, 3].forEach(i => tot[i] += f[i] * g / 100); it.push(n == 'Trứng gà' ? `${g / 50} quả trứng` : `${n} ${g}g`); };
+    const pf = pick(m[3], 1), cf = pick(m[4]);
     if (pf) { let g = m[2] * c.pro / (F[pf][1] / 100); g = pf == 'Trứng gà' ? Math.max(1, Math.min(3, Math.round(g / 50))) * 50 : Math.round(Math.min(g, 400) / 5) * 5; add(pf, g); }
     if (m[5]) add('Rau xanh luộc', 100);
     if (cf) { let g = (m[2] * c.t - k) / (F[cf][0] / 100); g = Math.round(Math.max(0, Math.min(g, cf == 'Hạt / đậu phộng' ? 30 : 500)) / 5) * 5; if (g) add(cf, g); }
@@ -155,7 +161,8 @@ T.food = () => {
   }).join('');
   V.innerHTML = `<h2>Thực đơn 1 ngày</h2><div class=card>Mục tiêu: <b>${Math.round(c.t)} kcal</b> · đạm ${Math.round(c.pro)}g<br>
   Thực đơn dưới đây ≈ <b>${Math.round(tot[0])} kcal</b> · đạm ${Math.round(tot[1])}g · tinh bột ${Math.round(tot[2])}g · béo ${Math.round(tot[3])}g<br>
-  <span class=mut>Giờ tập: ${p.time}. Uống ${c.water.toFixed(1)}L nước/ngày. Phần thiếu có thể bù bằng dầu ăn, trái cây hoặc rau. Lượng tính theo thực phẩm chín (trừ yến mạch khô).</span></div>${rows}
+  Chi phí ước tính ≈ <b>${Math.round(cost)}k đ/ngày</b> (≈ ${(cost * 30 / 1000).toFixed(1)} triệu/tháng)${p.cap && cost > p.cap ? `<br><span class=warn>Vượt ngân sách ${p.cap}k/ngày. Chọn mức "Học sinh / sinh viên" trong hồ sơ để có thực đơn rẻ hơn.</span>` : ''}<br>
+  <span class=mut>${BTIP[bd]} Giá chỉ là ước tính, thay đổi theo nơi mua.<br>Giờ tập: ${p.time}. Uống ${c.water.toFixed(1)}L nước/ngày. Phần thiếu có thể bù bằng dầu ăn, trái cây hoặc rau. Lượng tính theo thực phẩm chín (trừ yến mạch khô).</span></div>${rows}
   <p class=mut>Nếu ăn trước tập quá sát giờ (dưới 45 phút), chọn phần nhỏ như chuối. Dị ứng đã loại: ${bn.join(', ') || 'không có'}.</p>`;
 };
 
@@ -175,22 +182,45 @@ const CAM = {
     end: (mn, mx, r) => [mx < (r ? r.max - 8 : 168) && 'Duỗi hông, đứng thẳng hết ở trên'].filter(Boolean) },
   press: { n: 'Đẩy vai', tip: 'Quay NGANG hoặc chéo 45°, thấy rõ tay và thân.', need: ['s', 'e', 'w', 'h'], main: P => A(P.s, P.e, P.w), dn: 100, up: 155,
     chk: (P, m) => m > 110 && lean(P.s, P.h) > 15 ? ['Đừng ưỡn lưng, siết bụng và mông'] : [],
-    end: (mn, mx, r) => [mx < (r ? r.max - 8 : 158) && 'Đẩy thẳng tay lên hết'].filter(Boolean) }
+    end: (mn, mx, r) => [mx < (r ? r.max - 8 : 158) && 'Đẩy thẳng tay lên hết'].filter(Boolean) },
+  curl: { n: 'Curl tay trước', tip: 'Quay NGANG người, thấy rõ tay, khuỷu và hông.', need: ['s', 'e', 'w', 'h'], main: P => A(P.s, P.e, P.w), dn: 60, up: 140,
+    chk: P => lean(P.s, P.e) > 30 ? ['Giữ khuỷu tay sát thân, đừng vung người'] : lean(P.s, P.h) > 12 ? ['Đừng ngả người ra sau'] : [],
+    end: (mn, mx, r) => [mn > (r ? r.min + 10 : 75) && 'Gập tay cao hơn', mx < (r ? r.max - 10 : 145) && 'Duỗi tay hết ở dưới'].filter(Boolean) },
+  lunge: { n: 'Lunge', tip: 'Quay NGANG người, thấy cả hai chân, chân trước gần camera.', need: ['s', 'h', 'k', 'a'], main: P => A(P.h, P.k, P.a), dn: 110, up: 155,
+    chk: P => lean(P.s, P.h) > 25 ? ['Giữ thân thẳng đứng, đừng gập người'] : [],
+    end: (mn, mx, r) => [mn > (r ? r.min + 10 : 100) && 'Hạ thấp hơn', mx < (r ? r.max - 10 : 155) && 'Đứng thẳng hết ở trên'].filter(Boolean) }
 };
 let det, blaze = true, stream, run = false, facing = 'environment', cc, cx, st = null, calib = false, msg = '', fbT = '', fbAt = 0, lastSay = 0, sm = null;
 const vid = document.createElement('video');
+let camS = {};
 T.cam = () => {
-  V.innerHTML = `<h2>Kiểm tra form bằng camera</h2><div class=card><label>Bài tập</label><select id=ex onchange="st=null;sm=null;info()">${Object.entries(CAM).map(([k, v]) => `<option value=${k}>${v.n}`).join('')}</select>
+  const p = D.p, wk = Math.floor((Date.now() - new Date(D.start)) / 6048e5) + 1, DN = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'], td = (new Date().getDay() + 6) % 7;
+  camS = weekSess(p, wk); const days = [0, 1, 2, 3, 4, 5, 6].filter(i => camS[i]), dd = camS[td] ? td : days[0];
+  V.innerHTML = `<h2>Kiểm tra form bằng camera</h2><div class=card><label>Buổi tập (theo kế hoạch tuần này)</label><select id=dy onchange="camDay()">${days.map(i => `<option value=${i}${i == dd ? ' selected' : ''}>${DN[i]}${i == td ? ' (hôm nay)' : ''} · ${TPL[camS[i]][0]}`).join('')}</select>
+  ${camS[td] ? '' : '<p class=warn>Hôm nay là ngày nghỉ, đang hiển thị buổi tập gần nhất.</p>'}
+  <label>Bài tập trong buổi</label><select id=ex onchange="st=null;sm=null;info()"></select>
   <p class=mut id=tip style="margin:6px 0 0"></p><label style="display:flex;gap:8px;align-items:center"><input type=checkbox id=snd checked style="width:auto"> Cảnh báo bằng giọng nói</label></div>
+  <div class=card><div id=dm></div><p class=mut id=dc style="margin:6px 0 0"></p></div>
   <canvas id=cv width=640 height=480></canvas><p class=warn id=cm></p><div class=r2><button onclick="startCam()">Bật camera</button><button class=g onclick="flip()">Đổi camera trước/sau</button>
   <button class=g onclick="calib=true;say('Thực hiện 1 rep chuẩn')">Lưu rep mẫu (PT)</button><button class=g onclick="endSess()">Kết thúc và lưu</button></div>
   <div class=card id=cs style="margin-top:10px">Chưa có rep nào.</div>
   <p class=mut>Đặt điện thoại cố định, cách người 2–3 m, đủ sáng. Rep mẫu: nhờ PT hoặc người tập đúng thực hiện 1 rep, app dùng biên độ góc đó làm chuẩn cho bạn. Camera 2D chỉ ước lượng góc nên có thể sai khi bị che khuất.</p>`;
-  cc = $('#cv'); cx = cc.getContext('2d'); info();
+  cc = $('#cv'); cx = cc.getContext('2d'); camDay();
 };
-function info() { const k = $('#ex').value, r = D.ref[k]; $('#tip').textContent = CAM[k].tip + (r ? ` (Đang dùng rep mẫu: góc ${Math.round(r.min)}°–${Math.round(r.max)}°)` : ''); }
+function camDay() {
+  const k = camS[$('#dy').value], ex = TPL[k][1].slice(0, D.p.exp == 0 ? 3 : 9).map(en).filter(n => camOf(n));
+  $('#ex').innerHTML = ex.length ? ex.map(n => `<option value=${camOf(n)} data-n="${n}">${n}`).join('') : '<option value="">Buổi này chưa có bài kiểm tra form</option>';
+  st = null; sm = null; info();
+}
+function info() {
+  const o = $('#ex').selectedOptions[0], k = o && o.value;
+  if (!k) { $('#tip').textContent = 'Buổi này không có bài hỗ trợ chấm form AI. Bấm tên bài trong tab Kế hoạch để xem minh họa 3D.'; stopDemo(); $('#dm').innerHTML = ''; $('#dc').textContent = ''; return; }
+  const r = D.ref[k], a = animOf(o.dataset.n);
+  $('#tip').textContent = CAM[k].tip + (r ? ` (Đang dùng rep mẫu: góc ${Math.round(r.min)}°–${Math.round(r.max)}°)` : '');
+  if (a) { mount($('#dm'), a); $('#dc').textContent = ANIM[a].cue; }
+}
 async function startCam() {
-  if (run) return; const m = $('#cm'); m.textContent = 'Đang tải mô hình AI…';
+  if (run) return; if (!$('#ex').value) { $('#cm').textContent = 'Buổi này chưa có bài hỗ trợ kiểm tra form.'; return; } const m = $('#cm'); m.textContent = 'Đang tải mô hình AI…';
   try {
     if (!det) {
       try { det = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { runtime: 'tfjs', modelType: 'lite' }); blaze = true; }
@@ -260,6 +290,89 @@ function endSess() {
   st.reps.forEach(r => r.f.forEach(f => cnt[f] = (cnt[f] || 0) + 1));
   D.c.push({ d: today(), ex: $('#ex').value, n: st.reps.length, avg: a, top: Object.entries(cnt).sort((x, y) => y[1] - x[1])[0]?.[0] || '' }); save();
   $('#cs').innerHTML = `Đã lưu: ${st.reps.length} rep, điểm TB ${a}/100.` + (Object.keys(cnt).length ? '<br>Lỗi hay gặp: ' + Object.entries(cnt).sort((x, y) => y[1] - x[1]).map(e => `${e[0]} (${e[1]} rep)`).join('; ') : ''); st = null; sm = null;
+}
+
+// ---------------- Ngân sách, buổi tập hôm nay, minh họa 3D ----------------
+const PRICE = { 'Cơm trắng': 3, 'Khoai lang luộc': 4, 'Yến mạch (khô)': 9, 'Bánh mì': 6, 'Chuối': 3, 'Ức gà luộc': 12, 'Thịt bò nạc': 28, 'Cá thu / cá basa': 10, 'Trứng gà': 7, 'Đậu hũ': 3, 'Sữa chua Hy Lạp': 20, 'Rau xanh luộc': 2, 'Hạt / đậu phộng': 15, 'Cá hồi': 45, 'Whey protein': 100 }; // nghìn đồng / 100g, ước tính
+const PREM = ['Whey protein', 'Cá hồi', 'Thịt bò nạc'];
+const BTIP = {
+  sv: 'Học sinh / sinh viên: ưu tiên trứng, đậu hũ, cá basa, ức gà; tập tại nhà hoặc phòng gym giá sinh viên. Chưa cần thực phẩm chức năng, ăn đủ đạm từ thức ăn là được.',
+  mid: 'Ngân sách cơ bản: thực đơn cân bằng giữa giá và dinh dưỡng. Có thể thêm whey nếu khó ăn đủ đạm.',
+  inv: 'Đầu tư nghiêm túc: có thể thuê PT vài buổi đầu để chỉnh form, dùng whey khi khó ăn đủ đạm, creatine monohydrate 3–5g/ngày (hỏi bác sĩ nếu có bệnh thận hoặc đang dùng thuốc), đo thành phần cơ thể định kỳ.'
+};
+const en = e => D.p.eq == 'gym' ? e[0] : e[1];
+function weekSess(p, wk) { const s = {}; (SPLIT[p.n] || SPLIT[4]).forEach(([d, k]) => s[d] = p.n == 3 && wk % 2 == 0 ? (k == 'fa' ? 'fb' : 'fa') : k); return s; }
+// bài nào có chấm form bằng camera (theo tên bài hiển thị)
+const CAMRX = [[/^(Squat|Goblet)/, 'squat'], [/^(Romanian|RDL|Deadlift)/, 'dead'], [/^Hít đất/, 'pushup'], [/^Đẩy vai/, 'press'], [/^(Lunge|Bulgarian)/, 'lunge'], [/^Curl tạ/, 'curl']];
+const camOf = n => (CAMRX.find(r => r[0].test(n)) || [])[1];
+// bài nào có minh họa 3D
+const ANRX = [[/^Plank/, 'plank'], [/Pike/, 'pike'], [/^Hít đất/, 'pushup'], [/^(Bench|Incline)/, 'bench'], [/^Đẩy vai/, 'ohp'], [/^Tay sau cáp/, 'pushdown'], [/^Dips/, 'dips'], [/^Lat pulldown/, 'pulldown'],
+  [/^(Face|Reverse)/, 'facepull'], [/^Curl/, 'curl'], [/^(Row|Barbell row)/, 'row'], [/^(Lunge|Bulgarian)/, 'lunge'], [/^(Squat|Goblet|Leg press)/, 'squat'], [/^(Romanian|RDL|Deadlift|Gập đùi)/, 'rdl'], [/^Hip thrust/, 'thrust'], [/^Calf/, 'calf']];
+const animOf = n => (ANRX.find(r => r[0].test(n)) || [])[1];
+
+// Góc: 0 = hướng xuống, 90 = hướng về phía trước (+x), 180 = hướng lên. t = thân, th/sh = đùi/cẳng chân, ua/fa = cánh tay/cẳng tay
+const L = { t: .5, u: .45, l: .45, a: .3, f: .28 };
+const ANIM = {
+  squat: { cx: 0, eq: 'd', cue: 'Chân rộng bằng vai, lưng thẳng, xuống đến khi đùi song song sàn, gối theo hướng mũi chân.', P: [{ t: 180, th: 0, sh: 0, ua: 70, fa: 150 }, { t: 140, th: 80, sh: -20, ua: 70, fa: 150 }] },
+  rdl: { cx: 0, eq: 'b', cue: 'Đẩy hông ra sau, lưng phẳng, tạ sát chân, siết mông để đứng lên.', P: [{ t: 180, th: 0, sh: 0 }, { t: 110, th: 20, sh: 0 }] },
+  lunge: { cx: -.2, eq: 'd', cue: 'Bước dài, thân thẳng, hạ xuống đến khi đùi trước song song sàn, đẩy gót để đứng lên.', P: [{ t: 180, th: 0, sh: 0 }, { t: 175, th: 85, sh: 0, th2: -20, sh2: -80 }] },
+  calf: { cx: 0, cue: 'Nhón lên hết cỡ, giữ 1 giây, hạ chậm.', P: [{ t: 180, th: 0, sh: 0, ah: .08 }, { t: 180, th: 0, sh: 0, ah: .22 }] },
+  thrust: { cx: -.5, bn: [-1, .35, .5], cue: 'Lưng trên tựa ghế, đẩy hông lên đến khi thân thẳng, siết mông 1 giây.', P: [{ t: -120, th: 135, sh: 10, ua: 100, fa: 100 }, { t: -95, th: 95, sh: 5, ua: 100, fa: 100 }] },
+  bench: { cx: -.6, eq: 'b', bn: [-.7, .35, 1], cue: 'Ép bả vai xuống ghế, hạ tạ về ngực dưới, đẩy lên, khuỷu tay chếch khoảng 45–75° so với thân.', P: [{ t: -90, th: 100, sh: 0, ua: 180, fa: 180 }, { t: -90, th: 100, sh: 0, ua: 100, fa: 180 }] },
+  pushup: { cx: .6, cue: 'Thân thẳng từ vai đến gót, hạ ngực gần sát sàn, khuỷu tay chếch khoảng 45°.', P: [{ t: 115, th: -65, sh: -65 }, { t: 98, th: -82, sh: -82, ua: -70, fa: 72 }] },
+  pike: { cx: .3, cue: 'Hông cao, hạ đầu về phía sàn giữa hai tay rồi đẩy lên. Bài thay cho đẩy vai tạ.', P: [{ t: 60, th: -25, sh: -25 }, { t: 30, th: -25, sh: -25, ua: -60, fa: 40 }] },
+  ohp: { cx: 0, eq: 'd', cue: 'Siết bụng và mông, đẩy tạ thẳng lên trên đầu, không ưỡn lưng.', P: [{ t: 180, th: 0, sh: 0, ua: 10, fa: 170 }, { t: 180, th: 0, sh: 0, ua: 180, fa: 180 }] },
+  row: { cx: 0, eq: 'd', cue: 'Gập hông, lưng phẳng, kéo khuỷu tay ra sau sát thân, siết bả vai.', P: [{ t: 115, th: 20, sh: 0 }, { t: 115, th: 20, sh: 0, ua: -50, fa: -5 }] },
+  pulldown: { cx: 0, eq: 'b', cue: 'Ưỡn ngực nhẹ, kéo thanh xuống ngực trên bằng khuỷu tay, không đu người.', P: [{ t: 190, th: 95, sh: 0, ua: 180, fa: 180 }, { t: 190, th: 95, sh: 0, ua: 20, fa: 160 }] },
+  curl: { cx: 0, eq: 'd', cue: 'Khuỷu tay sát thân, gập tay lên, hạ chậm, không vung người.', P: [{ t: 180, th: 0, sh: 0 }, { t: 180, th: 0, sh: 0, fa: 150 }] },
+  pushdown: { cx: 0, cue: 'Khuỷu tay ghim sát hông, chỉ duỗi cẳng tay xuống hết cỡ.', P: [{ t: 180, th: 0, sh: 0, fa: 100 }, { t: 180, th: 0, sh: 0, fa: 5 }] },
+  facepull: { cx: 0, cue: 'Kéo về phía mặt, khuỷu tay cao, mở ngực và siết bả vai.', P: [{ t: 180, th: 0, sh: 0, ua: 95, fa: 95 }, { t: 180, th: 0, sh: 0, ua: 40, fa: 170 }] },
+  dips: { cx: -.5, bn: [-1, .48, .5], cue: 'Hạ người đến khi khuỷu khoảng 90°, vai không nhô lên sát tai, đẩy lên bằng tay sau.', P: [{ t: 175, th: 60, sh: 60, ua: -30, fa: -30 }, { t: 175, th: 70, sh: 70, ua: -60, fa: -20 }] },
+  plank: { cx: .6, cue: 'Thân thẳng, siết bụng và mông, không võng lưng. Giữ đủ thời gian.', P: [{ t: 98, th: -80, sh: -80, ua: 0, fa: 90 }] }
+};
+const pose = (A, B, k) => { const o = {}; ['t', 'th', 'sh', 'ua', 'fa', 'ah', 'th2', 'sh2'].forEach(f => { const g = q => q[f] ?? (f == 'ah' ? .08 : f == 'th2' ? q.th : f == 'sh2' ? q.sh : 0); o[f] = g(A) + (g(B) - g(A)) * k; }); return o; };
+function joints(q) {
+  const v = (a, l) => { a *= Math.PI / 180; return [Math.sin(a) * l, -Math.cos(a) * l]; }, ad = (a, b) => [a[0] + b[0], a[1] + b[1]], sb = (a, b) => [a[0] - b[0], a[1] - b[1]];
+  const an = [0, q.ah], kn = sb(an, v(q.sh, L.l)), hip = sb(kn, v(q.th, L.u)), kf = ad(hip, v(q.th2, L.u)), af = ad(kf, v(q.sh2, L.l)), sho = ad(hip, v(q.t, L.t)), el = ad(sho, v(q.ua, L.a));
+  return { an, kn, hip, kf, af, sho, el, hd: ad(el, v(q.fa, L.f)), head: ad(sho, v(q.t, .2)) };
+}
+let DM = null;
+function stopDemo() { if (DM) { DM.stop(); DM = null; } }
+function closeDemo() { stopDemo(); document.querySelectorAll('.mo').forEach(e => e.remove()); }
+function demo(name) {
+  const a = animOf(name); if (!a) return; closeDemo();
+  const o = document.createElement('div'); o.className = 'mo';
+  o.innerHTML = `<div class=box><h2>${name}</h2><div id=dmw></div><p class=mut>${ANIM[a].cue}</p><p class=mut>Kéo ngón tay để xoay góc nhìn. Đây là mô hình minh họa, không phải video thật.</p><button onclick="closeDemo()">Đóng</button></div>`;
+  o.onclick = e => { if (e.target == o) closeDemo(); }; document.body.appendChild(o); mount($('#dmw'), a);
+}
+function mount(box, key) {
+  stopDemo(); if (!window.THREE) { box.textContent = 'Không tải được thư viện 3D (cần mạng).'; return; }
+  const A = ANIM[key], W = box.clientWidth || 320, H = 260, R = new THREE.WebGLRenderer({ antialias: true }), V3 = THREE.Vector3;
+  R.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); R.setSize(W, H); R.setClearColor(0x111418); R.domElement.className = 'dm'; box.innerHTML = ''; box.appendChild(R.domElement);
+  const S = new THREE.Scene(), C = new THREE.PerspectiveCamera(40, W / H, .1, 50);
+  S.add(new THREE.AmbientLight(0xffffff, .75)); const dl = new THREE.DirectionalLight(0xffffff, .7); dl.position.set(2, 4, 3); S.add(dl);
+  const cy = new THREE.CylinderGeometry(1, 1, 1, 14), add = (g, c) => { const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: c })); S.add(m); return m; };
+  const fl = add(new THREE.CircleGeometry(1.7, 48), 0x1d2229); fl.rotation.x = -Math.PI / 2; fl.position.x = A.cx;
+  const NC = 0x3ddc97, FC = 0x2a9d6e, DEF = [['hip', 0, 'sho', 0, .12, NC], ['hip', .1, 'kn', .1, .075, NC], ['kn', .1, 'an', .1, .06, NC], ['hip', -.1, 'kf', -.1, .075, FC], ['kf', -.1, 'af', -.1, .06, FC],
+    ['sho', .2, 'el', .2, .05, NC], ['el', .2, 'hd', .2, .045, NC], ['sho', -.2, 'el', -.2, .05, FC], ['el', -.2, 'hd', -.2, .045, FC], ['hip', -.1, 'hip', .1, .075, NC], ['sho', -.2, 'sho', .2, .06, NC]];
+  const limbs = DEF.map(d => add(cy, d[5])), head = add(new THREE.SphereGeometry(.11, 16, 12), 0xeeeeee);
+  const eq = A.eq == 'b' ? [add(cy, 0xaaaaaa), add(cy, 0x777777), add(cy, 0x777777)] : A.eq == 'd' ? [add(cy, 0xaaaaaa), add(cy, 0xaaaaaa)] : [];
+  if (A.bn) { const b = add(new THREE.BoxGeometry(1, 1, 1), 0x39424d); b.scale.set(A.bn[2], .1, .4); b.position.set(A.bn[0], A.bn[1] - .05, 0); }
+  const seg = (m, a, b, r) => { const d = new V3().subVectors(b, a), l = d.length() || 1e-3; m.position.copy(a).addScaledVector(d, .5); m.scale.set(r, l, r); m.quaternion.setFromUnitVectors(new V3(0, 1, 0), d.divideScalar(l)); };
+  const P3 = (j, z) => new V3(j[0], j[1], z);
+  let on = true, auto = true, dr = 0; const t0 = performance.now();
+  R.domElement.onpointermove = e => { if (e.buttons) { dr += e.movementX * .012; auto = false; } };
+  (function loop() {
+    if (!on) return; requestAnimationFrame(loop);
+    const t = (performance.now() - t0) / 1000, two = A.P.length > 1, J = joints(pose(A.P[0], A.P[two ? 1 : 0], two ? .5 - .5 * Math.cos(t * 1.6) : 0));
+    DEF.forEach((d, i) => seg(limbs[i], P3(J[d[0]], d[1]), P3(J[d[2]], d[3]), d[4]));
+    head.position.set(J.head[0], J.head[1], 0);
+    if (A.eq == 'd') eq.forEach((m, i) => { m.rotation.x = Math.PI / 2; m.scale.set(.05, .2, .05); m.position.set(J.hd[0], J.hd[1], i ? -.2 : .2); });
+    if (A.eq == 'b') { eq.forEach(m => m.rotation.x = Math.PI / 2); eq[0].scale.set(.022, 1.1, .022); eq[0].position.set(J.hd[0], J.hd[1], 0); [1, 2].forEach(i => { eq[i].scale.set(.13, .04, .13); eq[i].position.set(J.hd[0], J.hd[1], i == 1 ? .5 : -.5); }); }
+    const th = (auto ? Math.sin(t * .4) : 0) + dr;
+    C.position.set(A.cx + 3.6 * Math.sin(th), 1.2, 3.6 * Math.cos(th)); C.lookAt(A.cx, .55, 0); R.render(S, C);
+  })();
+  DM = { stop() { on = false; R.dispose(); } };
 }
 
 // ---------------- Nhật ký ----------------
