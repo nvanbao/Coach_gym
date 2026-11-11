@@ -100,14 +100,26 @@ function saveP() {
 }
 
 // ---------------- Kế hoạch tập ----------------
+const ABS = [['Gập cơ bụng đẩy tạ cao', 'Crunch', 'a', '', '3x12'], ['Gập cơ bụng kiểu nga', 'Gập cơ bụng kiểu nga', 'a', '', '3x20/10'], ['Dumbbell side bend', 'Nghiêng người tạ đơn (side bend)', 'a', '', '4x12'], ['Nâng xà gập bụng', 'Nâng chân nằm (leg raise)', 'a', '', '4x12']];
+const CARDIO = ['Cardio: đi bộ leo dốc', 'Cardio: đi bộ nhanh', 'a', '', '15–20 phút'];
+// mỗi bài: [tên gym, tên tại nhà, loại m/a, (để trống), số set x rep]
 const TPL = {
-  push: ['Push (ngực – vai – tay sau)', [['Bench press', 'Hít đất', 'm', 'pushup'], ['Đẩy vai tạ đơn', 'Pike push-up', 'm', 'press'], ['Incline dumbbell press', 'Hít đất tay hẹp', 'a', 'pushup'], ['Tay sau cáp (pushdown)', 'Dips ghế', 'a']]],
-  pull: ['Pull (lưng – tay trước)', [['Lat pulldown', 'Row tạ đơn / ba lô', 'm'], ['Barbell row', 'Row tạ đơn 1 tay', 'm'], ['Face pull', 'Reverse fly tạ đơn', 'a'], ['Curl tạ đòn', 'Curl tạ đơn', 'a']]],
-  leg: ['Legs (chân – mông)', [['Squat', 'Goblet squat', 'm', 'squat'], ['Romanian deadlift', 'RDL tạ đơn', 'm', 'dead'], ['Leg press', 'Lunge', 'a'], ['Gập đùi sau', 'Hip thrust', 'a'], ['Calf raise', 'Calf raise', 'a']]],
-  up: ['Upper (thân trên)', [['Bench press', 'Hít đất', 'm', 'pushup'], ['Lat pulldown', 'Row tạ đơn', 'm'], ['Đẩy vai tạ đơn', 'Pike push-up', 'a', 'press'], ['Curl + tay sau', 'Curl + dips ghế', 'a']]],
-  lo: ['Lower (thân dưới)', [['Squat', 'Goblet squat', 'm', 'squat'], ['Deadlift', 'RDL tạ đơn', 'm', 'dead'], ['Bulgarian split squat', 'Bulgarian split squat', 'a'], ['Calf raise', 'Calf raise', 'a']]],
-  fa: ['Toàn thân A', [['Squat', 'Goblet squat', 'm', 'squat'], ['Bench press', 'Hít đất', 'm', 'pushup'], ['Row tạ đòn', 'Row tạ đơn', 'm'], ['Plank 3x40s', 'Plank 3x40s', 'a']]],
-  fb: ['Toàn thân B', [['Deadlift', 'RDL tạ đơn', 'm', 'dead'], ['Đẩy vai', 'Pike push-up', 'm', 'press'], ['Lat pulldown', 'Row tạ đơn', 'm'], ['Lunge', 'Lunge', 'a']]]
+  push: ['Ngực + vai + tay sau', [['Đẩy ngực ngang', 'Hít đất', 'm', '', '3x10'], ['Đẩy ngực dốc lên', 'Hít đất chân kê cao', 'm', '', '3x12'], ['Đẩy ngực tạ đơn ghế nằm', 'Hít đất tay rộng', 'm', '', '3x12'],
+    ['Ép ngực (máy pec deck)', 'Ép ngực tạ đơn / chai nước', 'a', '', '3x12 + 3x8'], ['Kéo ngực với dây cáp', 'Hít đất tay hẹp', 'a', '', '4x12'], ['Chest press (máy)', 'Dips ghế', 'a', '', '3x8'],
+    ['Bay vai', 'Bay vai tạ đơn', 'a', '', '4x12'], ['Kéo cáp tay sau', 'Tay sau tạ đơn qua đầu', 'a', '', '4x12'], ['Gập tạ đơn kiểu búa', 'Gập tạ đơn kiểu búa', 'a', '', '3x16/8'], ...ABS, CARDIO]],
+  pull: ['Lưng + tay trước', [['Seated cable row', 'Row tạ đơn / ba lô', 'm', '', '4x12'], ['Lat pulldown', 'Kéo xà (nếu có xà)', 'm', '', '4x12'], ['Đẩy ngực dốc lên', 'Hít đất chân kê cao', 'a', '', '3x12'],
+    ['EZ bar curl', 'Curl tạ đơn', 'a', '', '3x8'], ['T bar row', 'Row tạ đơn cúi sâu (thay T-bar)', 'm', '', '4x8'], ['Cuốn tạ búa ghế dốc', 'Cuốn tạ đơn ngồi dốc', 'a', '', '3x8'],
+    ['Gập tạ đơn kiểu búa', 'Gập tạ đơn kiểu búa', 'a', '', '3x16/8'], ['Single arm row', 'Single arm row', 'm', '', '3x8'], ...ABS, CARDIO]],
+  leg: ['Chân + mông', [['Squat', 'Goblet squat', 'm', '', '4x8-12'], ['Leg press', 'Lunge', 'm', '', '4x12'], ['Romanian deadlift', 'RDL tạ đơn', 'm', '', '3x10'], ['Gập đùi sau (máy)', 'Hip thrust', 'a', '', '3x12'],
+    ['Bulgarian split squat', 'Bulgarian split squat', 'a', '', '3x10'], ['Calf raise', 'Calf raise', 'a', '', '4x15'], ABS[0], ABS[3], CARDIO]],
+  up: ['Thân trên', [['Đẩy ngực ngang', 'Hít đất', 'm', '', '3x10'], ['Lat pulldown', 'Kéo xà (nếu có xà)', 'm', '', '4x12'], ['Đẩy vai tạ đơn', 'Pike push-up', 'm', '', '3x10'], ['Seated cable row', 'Row tạ đơn / ba lô', 'm', '', '3x12'],
+    ['Bay vai', 'Bay vai tạ đơn', 'a', '', '3x12'], ['EZ bar curl', 'Curl tạ đơn', 'a', '', '3x10'], ['Kéo cáp tay sau', 'Tay sau tạ đơn qua đầu', 'a', '', '3x12'], ABS[0], ABS[1], CARDIO]],
+  lo: ['Thân dưới', [['Squat', 'Goblet squat', 'm', '', '4x8-12'], ['Deadlift', 'RDL tạ đơn', 'm', '', '3x8'], ['Leg press', 'Lunge', 'm', '', '3x12'], ['Bulgarian split squat', 'Bulgarian split squat', 'a', '', '3x10'],
+    ['Gập đùi sau (máy)', 'Hip thrust', 'a', '', '3x12'], ['Calf raise', 'Calf raise', 'a', '', '4x15'], ABS[3], ABS[2], CARDIO]],
+  fa: ['Toàn thân A', [['Squat', 'Goblet squat', 'm', '', '3x8-12'], ['Đẩy ngực ngang', 'Hít đất', 'm', '', '3x8-12'], ['Seated cable row', 'Row tạ đơn / ba lô', 'm', '', '3x8-12'], ['Đẩy vai tạ đơn', 'Pike push-up', 'a', '', '3x10'],
+    ['Plank 3x40s', 'Plank 3x40s', 'a', '', ''], ABS[0], CARDIO]],
+  fb: ['Toàn thân B', [['Deadlift', 'RDL tạ đơn', 'm', '', '3x8-12'], ['Đẩy ngực dốc lên', 'Hít đất chân kê cao', 'm', '', '3x10'], ['Lat pulldown', 'Kéo xà (nếu có xà)', 'm', '', '3x8-12'], ['Lunge', 'Lunge', 'a', '', '3x10'],
+    ['Bay vai', 'Bay vai tạ đơn', 'a', '', '3x12'], ['Calf raise', 'Calf raise', 'a', '', '3x15'], ABS[1], CARDIO]]
 };
 const SPLIT = { 3: [[0, 'fa'], [2, 'fb'], [4, 'fa']], 4: [[0, 'up'], [1, 'lo'], [3, 'up'], [4, 'lo']], 5: [[0, 'push'], [1, 'pull'], [2, 'leg'], [3, 'up'], [4, 'lo']], 6: [[0, 'push'], [1, 'pull'], [2, 'leg'], [3, 'push'], [4, 'pull'], [5, 'leg']] };
 const RX = { gain: ['4x6-10', '3x10-12'], lean: ['3x8-12', '3x10-15'], cut: ['3x10-12', '3x12-15'], keep: ['3x8-12', '3x10-12'] };
@@ -125,9 +137,9 @@ T.plan = () => {
     const k = sess[i];
     if (!k) { h += `<div class=card><h3>${nm} · Nghỉ</h3><span class=mut>Đi bộ nhẹ 30 phút, giãn cơ, ngủ đủ 7–9 tiếng.</span></div>`; return; }
     const [title, ex] = TPL[k];
-    h += `<div class=card${i == tdi ? ' style="outline:1px solid var(--a)"' : ''}><h3>${nm}${i == tdi ? ' (hôm nay)' : ''} · ${title}</h3><table>${ex.slice(0, p.exp == 0 ? 3 : 9).map(e => {
-      const r = e[0].startsWith('Plank') ? '' : RX[p.goal][e[2] == 'm' ? 0 : 1].replace(/^\d/, x => dl ? x - 1 : x) + (dl ? ' nhẹ' : '');
-      return `<tr><td><span class=ex onclick="demo(this.textContent)">${en(e)}</span>${camOf(en(e)) ? ' 📷' : ''}</td><td align=right>${r}</td></tr>`;
+    h += `<div class=card${i == tdi ? ' style="outline:1px solid var(--a)"' : ''}><h3>${nm}${i == tdi ? ' (hôm nay)' : ''} · ${title}</h3><table>${ex.slice(0, p.exp == 0 ? 6 : 20).map(e => {
+      const r0 = e[0].startsWith('Plank') ? '' : (e[4] || RX[p.goal][e[2] == 'm' ? 0 : 1]), r = /phút/.test(r0) ? r0 : r0.replace(/^\d/, x => dl ? x - 1 : x) + (dl && r0 ? ' nhẹ' : '');
+      return `<tr><td><span class=ex onclick="demo(this.textContent)">${en(e)}</span>${camOf(en(e)) ? ' 📷' : ''}<div class=mut style="font-size:12px">${noteOf(en(e))}</div></td><td align=right>${r}</td></tr>`;
     }).join('')}</table><span class=mut>Khởi động 5–8 phút + 2 set nhẹ bài đầu.${p.goal == 'cut' || p.goal == 'lean' ? ' Cardio nhẹ 15–20 phút sau tập.' : ''}</span></div>`;
   });
   V.innerHTML = h + `<p class=mut>Bấm tên bài để xem minh họa 3D. 📷 = bài kiểm tra form bằng camera ở tab "Form AI" (theo đúng buổi tập).</p><button class=g onclick="if(confirm('Bắt đầu chu kỳ mới từ tuần 1?')){D.start=today();save();T.plan()}">Bắt đầu chu kỳ mới</button>
@@ -208,7 +220,7 @@ T.cam = () => {
   cc = $('#cv'); cx = cc.getContext('2d'); camDay();
 };
 function camDay() {
-  const k = camS[$('#dy').value], ex = TPL[k][1].slice(0, D.p.exp == 0 ? 3 : 9).map(en).filter(n => camOf(n));
+  const k = camS[$('#dy').value], ex = TPL[k][1].slice(0, D.p.exp == 0 ? 6 : 20).map(en).filter(n => camOf(n));
   $('#ex').innerHTML = ex.length ? ex.map(n => `<option value=${camOf(n)} data-n="${n}">${n}`).join('') : '<option value="">Buổi này chưa có bài kiểm tra form</option>';
   st = null; sm = null; info();
 }
@@ -217,7 +229,7 @@ function info() {
   if (!k) { $('#tip').textContent = 'Buổi này không có bài hỗ trợ chấm form AI. Bấm tên bài trong tab Kế hoạch để xem minh họa 3D.'; stopDemo(); $('#dm').innerHTML = ''; $('#dc').textContent = ''; return; }
   const r = D.ref[k], a = animOf(o.dataset.n);
   $('#tip').textContent = CAM[k].tip + (r ? ` (Đang dùng rep mẫu: góc ${Math.round(r.min)}°–${Math.round(r.max)}°)` : '');
-  if (a) { mount($('#dm'), a); $('#dc').textContent = ANIM[a].cue; }
+  if (a) { mount($('#dm'), a); $('#dc').textContent = ANIM[a].cue + ' Dụng cụ: ' + ANIM[a].w + (ANIM[a].sf ? ' An toàn: ' + ANIM[a].sf : ''); }
 }
 async function startCam() {
   if (run) return; if (!$('#ex').value) { $('#cm').textContent = 'Buổi này chưa có bài hỗ trợ kiểm tra form.'; return; } const m = $('#cm'); m.textContent = 'Đang tải mô hình AI…';
@@ -303,38 +315,124 @@ const BTIP = {
 const en = e => D.p.eq == 'gym' ? e[0] : e[1];
 function weekSess(p, wk) { const s = {}; (SPLIT[p.n] || SPLIT[4]).forEach(([d, k]) => s[d] = p.n == 3 && wk % 2 == 0 ? (k == 'fa' ? 'fb' : 'fa') : k); return s; }
 // bài nào có chấm form bằng camera (theo tên bài hiển thị)
-const CAMRX = [[/^(Squat|Goblet)/, 'squat'], [/^(Romanian|RDL|Deadlift)/, 'dead'], [/^Hít đất/, 'pushup'], [/^Đẩy vai/, 'press'], [/^(Lunge|Bulgarian)/, 'lunge'], [/^Curl tạ/, 'curl']];
+const CAMRX = [[/^(Squat|Goblet)/, 'squat'], [/^(Romanian|RDL|Deadlift)/, 'dead'], [/^Hít đất/, 'pushup'], [/^Đẩy vai/, 'press'], [/^(Lunge|Bulgarian)/, 'lunge'], [/^(EZ bar curl|Curl tạ|Gập tạ đơn kiểu búa)/, 'curl']];
 const camOf = n => (CAMRX.find(r => r[0].test(n)) || [])[1];
-// bài nào có minh họa 3D
-const ANRX = [[/^Plank/, 'plank'], [/Pike/, 'pike'], [/^Hít đất/, 'pushup'], [/^(Bench|Incline)/, 'bench'], [/^Đẩy vai/, 'ohp'], [/^Tay sau cáp/, 'pushdown'], [/^Dips/, 'dips'], [/^Lat pulldown/, 'pulldown'],
-  [/^(Face|Reverse)/, 'facepull'], [/^Curl/, 'curl'], [/^(Row|Barbell row)/, 'row'], [/^(Lunge|Bulgarian)/, 'lunge'], [/^(Squat|Goblet|Leg press)/, 'squat'], [/^(Romanian|RDL|Deadlift|Gập đùi)/, 'rdl'], [/^Hip thrust/, 'thrust'], [/^Calf/, 'calf']];
+// mỗi tên bài -> đúng một chuyển động 3D riêng
+const ANRX = [[/^Plank/, 'plank'], [/Pike/, 'pike'], [/chân kê cao/, 'pushfeet'], [/tay rộng/, 'pushwide'], [/(tay hẹp|kim cương)/, 'pushclose'], [/^Hít đất/, 'pushup'],
+  [/^Đẩy ngực ngang/, 'bench'], [/^Đẩy ngực dốc/, 'incline'], [/^Đẩy ngực tạ đơn/, 'dbpress'], [/^Ép ngực/, 'fly'], [/^Kéo ngực/, 'crossover'], [/^Chest press/, 'chestpress'],
+  [/^Bay vai/, 'lateral'], [/^Đẩy vai/, 'ohp'], [/^Kéo cáp tay sau/, 'pushdown'], [/^Tay sau tạ đơn/, 'ohext'], [/^Dips/, 'dips'],
+  [/kiểu búa/, 'hammer'], [/(ghế dốc|ngồi dốc)/, 'inclinecurl'], [/^(EZ bar curl|Curl)/, 'curl'],
+  [/^Seated cable row/, 'cablerow'], [/^Lat pulldown/, 'pulldown'], [/^Kéo xà/, 'pullup'], [/^T bar row|cúi sâu/, 'tbar'], [/^(Single arm row|Row tạ đơn 1 tay)/, 'dbrow1'], [/^(Row|Barbell row)/, 'row'],
+  [/^Gập cơ bụng đẩy/, 'cablecrunch'], [/^Crunch/, 'crunch'], [/kiểu nga/, 'russian'], [/(side bend|Nghiêng người)/, 'sidebend'], [/^Nâng xà/, 'hangraise'], [/^Nâng chân nằm/, 'legraise'], [/^Cardio/, 'walk'],
+  [/^Leg press/, 'legpress'], [/^Bulgarian/, 'bulg'], [/^Lunge/, 'lunge'], [/^(Squat|Goblet)/, 'squat'], [/^(Romanian|RDL|Deadlift)/, 'rdl'], [/^Gập đùi sau/, 'hamcurl'], [/^Hip thrust/, 'thrust'], [/^Calf/, 'calf']];
 const animOf = n => (ANRX.find(r => r[0].test(n)) || [])[1];
+const noteOf = n => { const a = animOf(n); return a && ANIM[a].w || ''; };
 
-// Góc: 0 = hướng xuống, 90 = hướng về phía trước (+x), 180 = hướng lên. t = thân, th/sh = đùi/cẳng chân, ua/fa = cánh tay/cẳng tay
+// Góc (độ): 0 = hướng xuống, 90 = hướng ra trước (+x), 180 = hướng lên.
+// t = thân, th/sh = đùi/cẳng chân (th2/sh2 = chân kia), ua/fa = cánh tay/cẳng tay (ua2/fa2 = tay kia)
+// ab = dang tay ngang, sw = mở tay ra hai bên khi đưa trước, tw = xoay thân, lb = nghiêng thân, hx/hy = cố định hông
 const L = { t: .5, u: .45, l: .45, a: .3, f: .28 };
+const BAR = [0, 2.3, .05, .05, .8], SEAT = [0, .37, .4, .08, .4];
 const ANIM = {
-  squat: { cx: 0, eq: 'd', cue: 'Chân rộng bằng vai, lưng thẳng, xuống đến khi đùi song song sàn, gối theo hướng mũi chân.', P: [{ t: 180, th: 0, sh: 0, ua: 70, fa: 150 }, { t: 140, th: 80, sh: -20, ua: 70, fa: 150 }] },
-  rdl: { cx: 0, eq: 'b', cue: 'Đẩy hông ra sau, lưng phẳng, tạ sát chân, siết mông để đứng lên.', P: [{ t: 180, th: 0, sh: 0 }, { t: 110, th: 20, sh: 0 }] },
-  lunge: { cx: -.2, eq: 'd', cue: 'Bước dài, thân thẳng, hạ xuống đến khi đùi trước song song sàn, đẩy gót để đứng lên.', P: [{ t: 180, th: 0, sh: 0 }, { t: 175, th: 85, sh: 0, th2: -20, sh2: -80 }] },
-  calf: { cx: 0, cue: 'Nhón lên hết cỡ, giữ 1 giây, hạ chậm.', P: [{ t: 180, th: 0, sh: 0, ah: .08 }, { t: 180, th: 0, sh: 0, ah: .22 }] },
-  thrust: { cx: -.5, bn: [-1, .35, .5], cue: 'Lưng trên tựa ghế, đẩy hông lên đến khi thân thẳng, siết mông 1 giây.', P: [{ t: -120, th: 135, sh: 10, ua: 100, fa: 100 }, { t: -95, th: 95, sh: 5, ua: 100, fa: 100 }] },
-  bench: { cx: -.6, eq: 'b', bn: [-.7, .35, 1], cue: 'Ép bả vai xuống ghế, hạ tạ về ngực dưới, đẩy lên, khuỷu tay chếch khoảng 45–75° so với thân.', P: [{ t: -90, th: 100, sh: 0, ua: 180, fa: 180 }, { t: -90, th: 100, sh: 0, ua: 100, fa: 180 }] },
-  pushup: { cx: .6, cue: 'Thân thẳng từ vai đến gót, hạ ngực gần sát sàn, khuỷu tay chếch khoảng 45°.', P: [{ t: 115, th: -65, sh: -65 }, { t: 98, th: -82, sh: -82, ua: -70, fa: 72 }] },
-  pike: { cx: .3, cue: 'Hông cao, hạ đầu về phía sàn giữa hai tay rồi đẩy lên. Bài thay cho đẩy vai tạ.', P: [{ t: 60, th: -25, sh: -25 }, { t: 30, th: -25, sh: -25, ua: -60, fa: 40 }] },
-  ohp: { cx: 0, eq: 'd', cue: 'Siết bụng và mông, đẩy tạ thẳng lên trên đầu, không ưỡn lưng.', P: [{ t: 180, th: 0, sh: 0, ua: 10, fa: 170 }, { t: 180, th: 0, sh: 0, ua: 180, fa: 180 }] },
-  row: { cx: 0, eq: 'd', cue: 'Gập hông, lưng phẳng, kéo khuỷu tay ra sau sát thân, siết bả vai.', P: [{ t: 115, th: 20, sh: 0 }, { t: 115, th: 20, sh: 0, ua: -50, fa: -5 }] },
-  pulldown: { cx: 0, eq: 'b', cue: 'Ưỡn ngực nhẹ, kéo thanh xuống ngực trên bằng khuỷu tay, không đu người.', P: [{ t: 190, th: 95, sh: 0, ua: 180, fa: 180 }, { t: 190, th: 95, sh: 0, ua: 20, fa: 160 }] },
-  curl: { cx: 0, eq: 'd', cue: 'Khuỷu tay sát thân, gập tay lên, hạ chậm, không vung người.', P: [{ t: 180, th: 0, sh: 0 }, { t: 180, th: 0, sh: 0, fa: 150 }] },
-  pushdown: { cx: 0, cue: 'Khuỷu tay ghim sát hông, chỉ duỗi cẳng tay xuống hết cỡ.', P: [{ t: 180, th: 0, sh: 0, fa: 100 }, { t: 180, th: 0, sh: 0, fa: 5 }] },
-  facepull: { cx: 0, cue: 'Kéo về phía mặt, khuỷu tay cao, mở ngực và siết bả vai.', P: [{ t: 180, th: 0, sh: 0, ua: 95, fa: 95 }, { t: 180, th: 0, sh: 0, ua: 40, fa: 170 }] },
-  dips: { cx: -.5, bn: [-1, .48, .5], cue: 'Hạ người đến khi khuỷu khoảng 90°, vai không nhô lên sát tai, đẩy lên bằng tay sau.', P: [{ t: 175, th: 60, sh: 60, ua: -30, fa: -30 }, { t: 175, th: 70, sh: 70, ua: -60, fa: -20 }] },
-  plank: { cx: .6, cue: 'Thân thẳng, siết bụng và mông, không võng lưng. Giữ đủ thời gian.', P: [{ t: 98, th: -80, sh: -80, ua: 0, fa: 90 }] }
+  squat: { cx: 0, w: 'Cần tạ: tạ đòn (gym) hoặc tạ đơn ôm ngực (tại nhà). Thân người không đủ kích thích lâu dài.', cue: 'Chân rộng bằng vai, lưng thẳng, xuống đến khi đùi song song sàn, gối theo hướng mũi chân.', P: [{ t: 180, th: 0, sh: 0, ua: 90, fa: 90 }, { t: 140, th: 80, sh: -20, ua: 90, fa: 90 }] },
+  legpress: { cx: .1, cy: .65, w: 'Máy leg press, chọn mức tạ rồi tăng dần.', cue: 'Lưng và mông dán vào ghế, đẩy bằng cả bàn chân, không khóa cứng gối ở trên, không để mông bật khỏi ghế ở dưới.', bx: [[-.38, .56, .95, .1, .4, 135], [.05, .26, .4, .08, .4]],
+    P: [{ hx: 0, hy: .35, t: -135, th: 135, sh: 135, ua: 45, fa: 45 }, { hx: 0, hy: .35, t: -135, th: 180, sh: 90, ua: 45, fa: 45 }] },
+  rdl: { cx: 0, w: 'Cần tạ: tạ đòn hoặc tạ đơn, tăng dần.', cue: 'Đẩy hông ra sau, lưng phẳng, tạ sát chân, siết mông để đứng lên.', P: [{ t: 180, th: 0, sh: 0 }, { t: 110, th: 20, sh: 0 }] },
+  lunge: { cx: -.2, w: 'Thân người trước; thêm 2 tạ đơn khi muốn tăng khối lượng.', cue: 'Bước dài, thân thẳng, hạ xuống đến khi đùi trước song song sàn, đẩy gót để đứng lên.', P: [{ t: 180, th: 0, sh: 0 }, { t: 175, th: 85, sh: 0, th2: -20, sh2: -80 }] },
+  bulg: { cx: -.3, w: 'Thân người trước; thêm tạ đơn khi muốn tăng khối lượng.', cue: 'Chân sau gác lên ghế, thân thẳng, hạ chân trước đến khi đùi song song sàn.', bx: [[-.62, .33, .5, .1, .4]], P: [{ t: 175, th: 0, sh: 0, th2: -30, sh2: -66 }, { t: 175, th: 80, sh: -10, th2: -10, sh2: -157 }] },
+  hamcurl: { cx: -.2, cy: .4, w: 'Máy gập đùi sau, chọn mức tạ rồi tăng dần.', cue: 'Nằm sấp, gập gót chạm gần mông, hạ chậm, không nhấc hông.', bx: [[-.2, .03, 1.8, .1, .45]], P: [{ hx: 0, hy: .2, t: 90, th: -90, sh: -90, ua: 100, fa: 100 }, { hx: 0, hy: .2, t: 90, th: -90, sh: -165, ua: 100, fa: 100 }] },
+  calf: { cx: 0, w: 'Thân người trước; cầm thêm tạ đơn hoặc dùng máy khi muốn tăng khối lượng.', cue: 'Nhón lên hết cỡ, giữ 1 giây, hạ chậm.', P: [{ t: 180, th: 0, sh: 0, ah: .08 }, { t: 180, th: 0, sh: 0, ah: .22 }] },
+  thrust: { cx: -.5, w: 'Cần tạ: đặt tạ đòn hoặc tạ đơn lên hông để tăng khối lượng.', cue: 'Lưng trên tựa ghế, đẩy hông lên đến khi thân thẳng, siết mông 1 giây.', bx: [[-1, .35, .5, .1, .4]], P: [{ t: -120, th: 135, sh: 10, ua: 100, fa: 100 }, { t: -95, th: 95, sh: 5, ua: 100, fa: 100 }] },
+  bench: { cx: -.6, w: 'Cần tạ: tạ đòn + ghế nằm, tăng dần mức tạ.', cue: 'Ép bả vai xuống ghế, hạ tạ về ngực dưới, đẩy lên, khuỷu tay chếch khoảng 45–75° so với thân.', bx: [[-.7, .35, 1, .1, .4]], P: [{ t: -90, th: 100, sh: 0, ua: 180, fa: 180 }, { t: -90, th: 100, sh: 0, ua: 100, fa: 180 }] },
+  incline: { cx: -.55, w: 'Cần tạ: tạ đòn hoặc tạ đơn + ghế dốc 30–45°.', cue: 'Ghế dốc 30–45°, hạ tạ về ngực trên, đẩy lên thẳng trên vai, không nảy tạ.', bx: [[-.62, .54, .9, .1, .4, 135], [-.2, .38, .4, .08, .4]], P: [{ t: -135, th: 100, sh: 0, ua: 175, fa: 175 }, { t: -135, th: 100, sh: 0, ua: 100, fa: 170 }] },
+  dbpress: { cx: -.6, w: 'Cần tạ: 2 tạ đơn + ghế nằm.', cue: 'Hạ hai tạ đơn sâu hơn thanh đòn một chút, khuỷu tay mở nhẹ, đẩy lên cho hai tạ gần chạm nhau.', bx: [[-.7, .35, 1, .1, .4]], P: [{ t: -90, th: 100, sh: 0, ua: 180, fa: 180, ab: 5 }, { t: -90, th: 100, sh: 0, ua: 85, fa: 160, ab: 25 }] },
+  fly: { cx: .1, w: 'Máy pec deck (chọn mức tạ) hoặc 2 tạ đơn nhẹ.', cue: 'Khuỷu hơi gập, khép hai tay trước ngực như ôm cây, siết ngực 1 giây, mở ra chậm.', bx: [SEAT, [-.22, .8, .08, .8, .5]], P: [{ hx: 0, hy: .45, t: 180, th: 95, sh: 20, ua: 90, fa: 90, sw: 75 }, { hx: 0, hy: .45, t: 180, th: 95, sh: 20, ua: 90, fa: 90, sw: 8 }] },
+  crossover: { cx: 0, w: 'Máy cáp hai bên, chọn mức tạ rồi tăng dần.', cue: 'Bước một chân ra trước, nghiêng thân nhẹ, kéo hai tay từ ngoài vào giữa trước ngực, siết ngực.', P: [{ t: 170, th: 15, sh: 0, th2: -15, sh2: 0, ua: 95, fa: 95, sw: 70 }, { t: 170, th: 15, sh: 0, th2: -15, sh2: 0, ua: 40, fa: 40, sw: 5 }] },
+  chestpress: { cx: .1, w: 'Máy chest press, chọn mức tạ rồi tăng dần.', cue: 'Lưng ép vào ghế, đẩy thẳng ra trước, không khóa cứng khuỷu, hạ chậm.', bx: [SEAT, [-.22, .8, .08, .8, .5]], P: [{ hx: 0, hy: .45, t: 180, th: 95, sh: 20, ua: -30, fa: 90 }, { hx: 0, hy: .45, t: 180, th: 95, sh: 20, ua: 90, fa: 90 }] },
+  lateral: { cx: 0, w: 'Cần tạ nhẹ: 2 tạ đơn khoảng 3–10 kg, tăng rất từ từ.', cue: 'Khuỷu hơi gập, nâng tay sang hai bên đến ngang vai, hạ chậm, không vung người.', P: [{ t: 180, th: 0, sh: 0, ua: 0, fa: 0, ab: 5 }, { t: 180, th: 0, sh: 0, ua: 0, fa: 0, ab: 85 }] },
+  ohp: { cx: 0, w: 'Cần tạ: tạ đơn hoặc tạ đòn, tăng dần.', cue: 'Siết bụng và mông, đẩy tạ thẳng lên trên đầu, không ưỡn lưng.', P: [{ t: 180, th: 0, sh: 0, ua: 10, fa: 170 }, { t: 180, th: 0, sh: 0, ua: 180, fa: 180 }] },
+  pushdown: { cx: 0, w: 'Máy cáp, chọn mức tạ rồi tăng dần.', cue: 'Khuỷu tay ghim sát hông, chỉ duỗi cẳng tay xuống hết cỡ.', P: [{ t: 180, th: 0, sh: 0, fa: 100 }, { t: 180, th: 0, sh: 0, fa: 5 }] },
+  ohext: { cx: 0, w: 'Cần 1 tạ đơn cầm hai tay, tăng dần.', cue: 'Khuỷu tay chỉ lên trần, giữ cố định, chỉ duỗi cẳng tay lên rồi hạ ra sau đầu.', P: [{ t: 180, th: 0, sh: 0, ua: 180, fa: -20 }, { t: 180, th: 0, sh: 0, ua: 180, fa: 180 }] },
+  dips: { cx: -.5, w: 'Thân người trước; kẹp đĩa tạ lên đùi khi muốn tăng khối lượng.', cue: 'Hạ người đến khi khuỷu khoảng 90°, vai không nhô lên sát tai, đẩy lên bằng tay sau.', bx: [[-1, .43, .5, .1, .4]], P: [{ t: 175, th: 60, sh: 60, ua: -30, fa: -30 }, { t: 175, th: 70, sh: 70, ua: -60, fa: -20 }] },
+  pushup: { cx: .6, w: 'Thân người, không cần tạ. Muốn nặng hơn: đeo ba lô có sách hoặc tập chậm.', cue: 'Thân thẳng từ vai đến gót, hạ ngực gần sát sàn, khuỷu tay chếch khoảng 45°.', P: [{ t: 115, th: -65, sh: -65 }, { t: 98, th: -82, sh: -82, ua: -70, fa: 72 }] },
+  pushwide: { cx: .6, w: 'Thân người, không cần tạ. Muốn nặng hơn: đeo ba lô có sách.', cue: 'Hai tay rộng hơn vai, nhấn vào ngực ngoài, thân thẳng, hạ chậm.', P: [{ t: 115, th: -65, sh: -65, ab: 25 }, { t: 98, th: -82, sh: -82, ua: -70, fa: 72, ab: 25 }] },
+  pushclose: { cx: .6, w: 'Thân người, không cần tạ. Muốn nặng hơn: đeo ba lô có sách.', cue: 'Hai tay hẹp hơn vai, khuỷu tay sát thân, nhấn vào tay sau và ngực trong.', P: [{ t: 115, th: -65, sh: -65, ab: -14 }, { t: 98, th: -82, sh: -82, ua: -70, fa: 72, ab: -14 }] },
+  pushfeet: { cx: .6, w: 'Thân người, không cần tạ. Chân kê ghế để nặng hơn.', cue: 'Chân kê cao trên ghế, thân thẳng, hạ ngực gần sàn, nhấn vào ngực trên và vai.', bx: [[-.15, .2, .5, .4, .4]], P: [{ t: 97, th: -83, sh: -83, ah: .45 }, { t: 82, th: -98, sh: -98, ah: .45, ua: -70, fa: 72 }] },
+  pike: { cx: .3, w: 'Thân người, không cần tạ. Bài thay cho đẩy vai tạ.', cue: 'Hông cao, hạ đầu về phía sàn giữa hai tay rồi đẩy lên.', P: [{ t: 60, th: -25, sh: -25 }, { t: 30, th: -25, sh: -25, ua: -60, fa: 40 }] },
+  plank: { cx: .6, w: 'Không cần tạ.', cue: 'Thân thẳng, siết bụng và mông, không võng lưng. Giữ đủ thời gian.', P: [{ t: 98, th: -80, sh: -80, ua: 0, fa: 90 }] },
+  cablerow: { cx: .2, w: 'Máy cáp ngồi, chọn mức tạ rồi tăng dần.', cue: 'Ngực ưỡn, kéo tay về bụng, khép bả vai, không ngả người quá nhiều.', bx: [SEAT], P: [{ hx: 0, hy: .45, t: 175, th: 95, sh: 20, ua: 90, fa: 90 }, { hx: 0, hy: .45, t: 190, th: 95, sh: 20, ua: -70, fa: 95 }] },
+  pulldown: { cx: 0, w: 'Máy cáp, chọn mức tạ rồi tăng dần.', cue: 'Ưỡn ngực nhẹ, kéo thanh xuống ngực trên bằng khuỷu tay, không đu người.', bx: [[-.5, .42, .45, .08, .4]], P: [{ t: 190, th: 95, sh: 0, ua: 180, fa: 180 }, { t: 190, th: 95, sh: 0, ua: 20, fa: 160 }] },
+  pullup: { cx: 0, cy: 1.2, d: 4.8, w: 'Thân người trước; đeo đai tạ khi đã kéo được nhiều rep.', cue: 'Treo người, kéo khuỷu xuống để cằm qua xà, hạ chậm đến khi tay duỗi.', bx: [BAR], P: [{ t: 180, th: 0, sh: 0, ua: 180, fa: 180, ah: .3 }, { t: 180, th: 0, sh: 0, ua: 40, fa: 200, ah: .85 }] },
+  tbar: { cx: 0, w: 'Cần tạ: thanh T-bar + đĩa tạ.', cue: 'Gập hông, lưng phẳng, kéo tạ về bụng dưới bằng khuỷu tay, siết giữa lưng.', P: [{ t: 125, th: 35, sh: 5 }, { t: 125, th: 35, sh: 5, ua: -55, fa: -10 }] },
+  row: { cx: 0, w: 'Cần tạ: tạ đơn hoặc tạ đòn (tại nhà dùng ba lô).', cue: 'Gập hông, lưng phẳng, kéo khuỷu tay ra sau sát thân, siết bả vai.', P: [{ t: 115, th: 20, sh: 0 }, { t: 115, th: 20, sh: 0, ua: -50, fa: -5 }] },
+  dbrow1: { cx: .25, w: 'Cần 1 tạ đơn + ghế, tăng dần.', cue: 'Một tay và một gối chống lên ghế, kéo tạ về hông, khuỷu tay sát thân, không xoay người.', bx: [[.35, .5, .8, .1, .4]],
+    P: [{ hx: 0, hy: .95, t: 110, th: 10, sh: -5, th2: 30, sh2: -70, ua: 0, fa: 0, ua2: 0, fa2: 0 }, { hx: 0, hy: .95, t: 110, th: 10, sh: -5, th2: 30, sh2: -70, ua: -60, fa: -10, ua2: 0, fa2: 0 }] },
+  curl: { cx: 0, w: 'Cần tạ: thanh EZ hoặc tạ đơn, tăng dần.', cue: 'Khuỷu tay sát thân, gập tay lên, hạ chậm, không vung người.', P: [{ t: 180, th: 0, sh: 0 }, { t: 180, th: 0, sh: 0, fa: 150 }] },
+  hammer: { cx: 0, w: 'Cần 2 tạ đơn, tăng dần.', cue: 'Cầm tạ kiểu búa (lòng bàn tay hướng vào nhau), gập luân phiên từng tay, khuỷu sát thân.', P: [{ t: 180, th: 0, sh: 0, fa: 150, fa2: 0 }, { t: 180, th: 0, sh: 0, fa: 0, fa2: 150 }] },
+  inclinecurl: { cx: -.15, w: 'Cần 2 tạ đơn + ghế dốc, dùng tạ nhẹ hơn curl đứng.', cue: 'Tựa lưng vào ghế dốc, tay buông thẳng ra sau thân, gập tay lên mà không đưa khuỷu ra trước.', bx: [[-.42, .67, .95, .1, .4, 135], SEAT], P: [{ hx: 0, hy: .45, t: 225, th: 95, sh: 20, ua: 15, fa: 0 }, { hx: 0, hy: .45, t: 225, th: 95, sh: 20, ua: 15, fa: 150 }] },
+  cablecrunch: { cx: -.1, w: 'Máy cáp, chọn mức tạ rồi tăng dần.', cue: 'Quỳ gối, kéo dây qua đầu, cuộn lưng để khuỷu tay xuống gần đùi, không kéo bằng tay.', P: [{ hx: 0, hy: .45, t: 175, th: 0, sh: -90, ua: 40, fa: 170 }, { hx: 0, hy: .45, t: 115, th: 0, sh: -90, ua: 70, fa: 130 }] },
+  crunch: { cx: 0, cy: .4, w: 'Không cần tạ. Ôm đĩa tạ trước ngực khi đã dễ.', cue: 'Nằm ngửa, gối gập, cuộn vai khỏi sàn, siết bụng, hạ chậm.', P: [{ hx: 0, hy: .12, t: -95, th: 130, sh: -43, ua: 100, fa: 100 }, { hx: 0, hy: .12, t: -135, th: 130, sh: -43, ua: 100, fa: 100 }] },
+  russian: { cx: .3, cy: .5, w: 'Không cần tạ; cầm đĩa tạ nhỏ khi đã dễ.', cue: 'Ngồi ngả người, chân nâng khỏi sàn, xoay thân sang hai bên, mắt nhìn theo tay.', P: [{ hx: 0, hy: .12, t: 215, th: 115, sh: 60, ua: 90, fa: 90, tw: -50 }, { hx: 0, hy: .12, t: 215, th: 115, sh: 60, ua: 90, fa: 90, tw: 50 }] },
+  sidebend: { cx: 0, w: 'Cần 1 tạ đơn, tăng dần.', cue: 'Đứng thẳng, nghiêng thân sang bên có tạ rồi trở lại, không xoay người.', P: [{ t: 180, th: 0, sh: 0, lb: -25 }, { t: 180, th: 0, sh: 0, lb: 25 }] },
+  hangraise: { cx: .2, cy: 1.2, d: 4.8, w: 'Không cần tạ, chỉ cần xà đơn.', cue: 'Treo người trên xà, cuộn hông nâng gối lên ngực, hạ chậm, không đu người.', bx: [BAR], P: [{ hx: 0, hy: 1.2, t: 180, th: 0, sh: 0, ua: 180, fa: 180 }, { hx: 0, hy: 1.2, t: 175, th: 100, sh: 10, ua: 180, fa: 180 }] },
+  legraise: { cx: .2, cy: .5, w: 'Không cần tạ.', cue: 'Nằm ngửa, lưng dưới ép sàn, nâng chân thẳng lên rồi hạ chậm, không để chân chạm sàn.', P: [{ hx: 0, hy: .12, t: -90, th: 90, sh: 90, ua: -90, fa: -90 }, { hx: 0, hy: .12, t: -90, th: 170, sh: 170, ua: -90, fa: -90 }] },
+  walk: { cx: 0, sp: 3.4, w: 'Máy chạy bộ, tăng độ dốc 8–12%, đi nhanh vừa phải.', cue: 'Đi bộ leo dốc, thân hơi nghiêng trước, không bám tay vào máy.', P: [{ hx: 0, hy: .95, t: 172, th: 22, sh: 0, th2: -22, sh2: -25, ua: -30, fa: 10, ua2: 30, fa2: 60 }, { hx: 0, hy: .95, t: 172, th: -22, sh: -25, th2: 22, sh2: 0, ua: 30, fa: 60, ua2: -30, fa2: 10 }] }
 };
-const pose = (A, B, k) => { const o = {}; ['t', 'th', 'sh', 'ua', 'fa', 'ah', 'th2', 'sh2'].forEach(f => { const g = q => q[f] ?? (f == 'ah' ? .08 : f == 'th2' ? q.th : f == 'sh2' ? q.sh : 0); o[f] = g(A) + (g(B) - g(A)) * k; }); return o; };
+
+// ---- Sơ đồ máy tập kẹp vào người que: khung xám, dây cáp vàng, khối tạ tối ----
+const MC = 0x8a94a3, PD = 0x4a5360, CB = 0xe0b84c, ST = 0x59626f, post = (x, h, z) => [x, h / 2, .08, h, .08, 0, MC, z];
+const MCH = {
+  legpress: { sf: 'Không khóa cứng gối ở trên, không để mông và lưng dưới nhấc khỏi ghế, đặt chân cao vừa phải, gài chốt an toàn trước khi rời máy.',
+    bx: [[.45, .72, 1.9, .06, .06, 45, MC, .3], [.45, .72, 1.9, .06, .06, 45, MC, -.3]], fw: [['anN', .07, .07, .04, .6, .5, 45, PD], ['anN', .33, .33, .25, .25, .5, 45, ST]] },
+  fly: { sf: 'Chỉnh ghế để tay ngang ngực, không đưa khuỷu ra sau quá vai, không giật tạ.',
+    bx: [post(.2, 1.4, .95), post(.2, 1.4, -.95), [.2, 1.4, .08, .08, 1.9, 0, MC], [-.55, .7, .2, 1.2, .45, 0, ST]], fw: [['hdN', 0, 0, .1, .4, .14, 0, PD], ['hdF', 0, 0, .1, .4, .14, 0, PD]] },
+  chestpress: { sf: 'Chỉnh ghế để tay đẩy ngang ngực, lưng áp ghế, không khóa cứng khuỷu, không nhấc mông.',
+    bx: [post(-.28, 1.0, .38), post(-.28, 1.0, -.38), [-.55, .7, .2, 1.2, .45, 0, ST]], sg: [[['hdN', 0], [-.28, .95, .38], .035, MC], [['hdF', 0], [-.28, .95, -.38], .035, MC], ['hdN', 'hdF', .03, MC]] },
+  pulldown: { cy: 1.2, d: 4.8, sf: 'Kéo thanh về ngực trên, không kéo ra sau gáy, không ngả người quá nhiều, chỉnh đệm gối ôm sát đùi.',
+    bx: [post(-.85, 2.6, .5), post(-.85, 2.6, -.5), [-.62, 2.6, .5, .07, .12, 0, MC], [-1.1, 1.2, .25, 2.2, .5, 0, ST], [-.15, .68, .25, .1, .5, 0, PD]], sg: [[[-.5, 2.55, 0], 'mid', .012, CB], [['hdN', .28], ['hdF', -.28], .03, MC]] },
+  cablerow: { d: 4.4, sf: 'Lưng thẳng, khuỷu sát thân, không kéo bằng lưng dưới, đặt chân chắc vào bệ.',
+    bx: [[.5, .04, 2.2, .08, .35, 0, MC], [.75, .28, .05, .5, .5, -15, PD], [1.5, .6, .1, 1.2, .3, 0, MC]], sg: [[[1.5, .45, 0], 'mid', .012, CB], ['hdN', 'hdF', .03, MC]] },
+  crossover: { cy: 1.1, d: 4.8, sf: 'Bước một chân ra trước cho vững, khuỷu hơi gập và giữ nguyên góc, không kéo bằng vai.',
+    bx: [post(.1, 2.3, .85), post(.1, 2.3, -.85), [.1, 2.3, .1, .08, 1.8, 0, MC], [-.35, 1.1, .25, 2.2, .9, 0, ST]], sg: [[[.1, 2.2, .85], 'hdN', .012, CB], [[.1, 2.2, -.85], 'hdF', .012, CB]] },
+  pushdown: { cy: 1.1, d: 4.6, sf: 'Khuỷu ghim sát hông, không nghiêng người đè xuống, duỗi hết nhưng không khóa gắt khuỷu.',
+    bx: [post(.55, 2.3, 0), [.35, 2.3, .45, .08, .1, 0, MC], [.8, 1.15, .25, 2.3, .5, 0, ST]], sg: [[[.2, 2.25, 0], 'mid', .012, CB], ['hdN', 'hdF', .03, MC]] },
+  cablecrunch: { cy: 1.1, d: 4.6, sf: 'Cuộn lưng bằng bụng, hông giữ yên, không kéo bằng tay và không ngồi bệt xuống gót.',
+    bx: [post(.6, 2.3, 0), [.4, 2.3, .45, .08, .1, 0, MC], [.85, 1.15, .25, 2.3, .5, 0, ST]], sg: [[[.25, 2.25, 0], 'mid', .012, CB]] },
+  hamcurl: { sf: 'Chỉnh đệm lăn ngay trên gót, không nhấc hông khỏi ghế, hạ chậm, không buông tạ.',
+    bx: [[-1.3, .55, .3, 1.1, .5, 0, ST]], sg: [[[-.45, .2, .3], ['anN', .15], .035, MC], [[-.45, .2, -.3], ['anF', -.15], .035, MC], [['anN', .15], ['anF', -.15], .06, PD]] },
+  tbar: { sf: 'Giữ lưng phẳng, không giật tạ, tập chậm, tuyệt đối không gù lưng khi tạ nặng.',
+    bx: [[0, .04, 1.2, .06, .5, 0, MC], [.85, .2, .08, .4, .4, 0, ST]], sg: [[[.95, .12, 0], 'mid', .03, MC]] },
+  pullup: { sf: 'Khởi động vai trước, không đu người, hạ chậm đến khi tay duỗi, không khóa gắt khuỷu.', bx: [post(0, 2.3, .5), post(0, 2.3, -.5)] },
+  hangraise: { sf: 'Không đu người, cuộn hông để nâng gối, hạ chậm. Tránh nếu đang đau vai hoặc lưng dưới.', bx: [post(0, 2.3, .5), post(0, 2.3, -.5)] },
+  walk: { d: 4.2, cy: .8, sf: 'Bám nhẹ khi mới tập, tăng dốc từ từ, giữ lưng thẳng, dừng nếu chóng mặt hoặc đau gối.',
+    bx: [[0, .04, 1.6, .08, .6, 0, PD], post(.9, 1.1, .35), post(.9, 1.1, -.35), [.9, 1.1, .06, .06, .7, 0, MC], [1.0, 1.2, .2, .25, .5, -20, ST]] },
+  bench: { sf: 'Luôn có người bảo hộ hoặc đặt chốt an toàn, siết bả vai, chân đạp sàn, không nảy tạ lên ngực.',
+    bx: [post(-1.25, 1.3, .45), post(-1.25, 1.3, -.45), [-.95, .6, .6, .04, .04, 0, CB, .45], [-.95, .6, .6, .04, .04, 0, CB, -.45]] },
+  incline: { sf: 'Luôn có người bảo hộ hoặc đặt chốt an toàn, ghế dốc 30–45°, không nảy tạ, không ưỡn lưng quá mức.',
+    bx: [post(-1.3, 1.4, .45), post(-1.3, 1.4, -.45)] },
+  squat: { sf: 'Đặt chốt an toàn thấp hơn đáy squat, ưỡn ngực, gối theo hướng mũi chân, không tăng tạ quá nhanh.',
+    bx: [post(-.55, 2.2, .5), post(-.55, 2.2, -.5), post(.55, 2.2, .5), post(.55, 2.2, -.5), [0, .75, 1.1, .04, .04, 0, CB, .5], [0, .75, 1.1, .04, .04, 0, CB, -.5]] }
+};
+for (const k in MCH) { const m = MCH[k], a = ANIM[k]; a.bx = (a.bx || []).concat(m.bx || []); a.sg = m.sg || []; a.fw = m.fw || []; a.sf = m.sf; ['cy', 'd'].forEach(f => { if (m[f] != null) a[f] = m[f]; }); }
+const pose = (A, B, k) => {
+  const o = {}, d = { th2: 'th', sh2: 'sh', ua2: 'ua', fa2: 'fa' }, g = (q, f) => q[f] ?? (d[f] ? g(q, d[f]) : f == 'ah' ? .08 : 0);
+  ['t', 'th', 'sh', 'ua', 'fa', 'ah', 'th2', 'sh2', 'ua2', 'fa2', 'ab', 'sw', 'tw', 'lb'].forEach(f => o[f] = g(A, f) + (g(B, f) - g(A, f)) * k);
+  ['hx', 'hy'].forEach(f => o[f] = A[f] == null ? null : A[f] + ((B[f] ?? A[f]) - A[f]) * k);
+  return o;
+};
 function joints(q) {
-  const v = (a, l) => { a *= Math.PI / 180; return [Math.sin(a) * l, -Math.cos(a) * l]; }, ad = (a, b) => [a[0] + b[0], a[1] + b[1]], sb = (a, b) => [a[0] - b[0], a[1] - b[1]];
-  const an = [0, q.ah], kn = sb(an, v(q.sh, L.l)), hip = sb(kn, v(q.th, L.u)), kf = ad(hip, v(q.th2, L.u)), af = ad(kf, v(q.sh2, L.l)), sho = ad(hip, v(q.t, L.t)), el = ad(sho, v(q.ua, L.a));
-  return { an, kn, hip, kf, af, sho, el, hd: ad(el, v(q.fa, L.f)), head: ad(sho, v(q.t, .2)) };
+  const R = Math.PI / 180, v = (a, l) => [Math.sin(a * R) * l, -Math.cos(a * R) * l], ad = (a, b) => [a[0] + b[0], a[1] + b[1]], sb = (a, b) => [a[0] - b[0], a[1] - b[1]];
+  let kn, hip, an;
+  if (q.hy != null) { hip = [q.hx, q.hy]; kn = ad(hip, v(q.th, L.u)); an = ad(kn, v(q.sh, L.l)); }
+  else { an = [0, q.ah]; kn = sb(an, v(q.sh, L.l)); hip = sb(kn, v(q.th, L.u)); }
+  const kf = ad(hip, v(q.th2, L.u)), af = ad(kf, v(q.sh2, L.l)), s2 = ad(hip, v(q.t, L.t)), lb = q.lb * R;
+  const sho = [s2[0], hip[1] + (s2[1] - hip[1]) * Math.cos(lb)], sz = (s2[1] - hip[1]) * Math.sin(lb), h2 = v(q.t, .2);
+  const arm = (side, a, l, f) => { const dx = Math.sin(a * R), dy = -Math.cos(a * R), ab = q.ab * R, sw = q.sw * R, tw = q.tw * R;
+    return [f[0] + dx * Math.cos(sw) * Math.cos(tw) * l, f[1] + dy * Math.cos(ab) * l, f[2] - dy * Math.sin(ab) * side * l + side * dx * Math.sin(sw) * l + dx * Math.sin(tw) * l]; };
+  const shoN = [sho[0], sho[1], sz + .2], shoF = [sho[0], sho[1], sz - .2], elN = arm(1, q.ua, L.a, shoN), elF = arm(-1, q.ua2, L.a, shoF);
+  const z = (p, s) => [p[0], p[1], s], hN = arm(1, q.fa, L.f, elN), hF = arm(-1, q.fa2, L.f, elF);
+  return { mid: [(hN[0] + hF[0]) / 2, (hN[1] + hF[1]) / 2, (hN[2] + hF[2]) / 2], hip0: z(hip, 0), hipN: z(hip, .1), hipF: z(hip, -.1), knN: z(kn, .1), anN: z(an, .1), knF: z(kf, -.1), anF: z(af, -.1), sho0: [sho[0], sho[1], sz], shoN, shoF, elN, elF,
+    hdN: hN, hdF: hF, head: [sho[0] + h2[0], sho[1] + h2[1] * Math.cos(lb), sz + h2[1] * Math.sin(lb)] };
 }
 let DM = null;
 function stopDemo() { if (DM) { DM.stop(); DM = null; } }
@@ -342,35 +440,36 @@ function closeDemo() { stopDemo(); document.querySelectorAll('.mo').forEach(e =>
 function demo(name) {
   const a = animOf(name); if (!a) return; closeDemo();
   const o = document.createElement('div'); o.className = 'mo';
-  o.innerHTML = `<div class=box><h2>${name}</h2><div id=dmw></div><p class=mut>${ANIM[a].cue}</p><p class=mut>Kéo ngón tay để xoay góc nhìn. Đây là mô hình minh họa, không phải video thật.</p><button onclick="closeDemo()">Đóng</button></div>`;
+  o.innerHTML = `<div class=box><h2>${name}</h2><div id=dmw></div><p class=mut>${ANIM[a].cue}</p><p style="margin:6px 0"><b>Dụng cụ:</b> ${ANIM[a].w}</p>${ANIM[a].sf ? `<p style="margin:6px 0"><b>An toàn:</b> ${ANIM[a].sf}</p><p class=mut>Khung máy màu xám, dây cáp màu vàng, khối tạ màu tối.</p>` : ''}<p class=mut>Kéo ngón tay để xoay góc nhìn. Đây là mô hình minh họa, không phải video thật.</p><button onclick="closeDemo()">Đóng</button></div>`;
   o.onclick = e => { if (e.target == o) closeDemo(); }; document.body.appendChild(o); mount($('#dmw'), a);
 }
 function mount(box, key) {
   stopDemo(); if (!window.THREE) { box.textContent = 'Không tải được thư viện 3D (cần mạng).'; return; }
-  const A = ANIM[key], W = box.clientWidth || 320, H = 260, R = new THREE.WebGLRenderer({ antialias: true }), V3 = THREE.Vector3;
+  const A = ANIM[key], W = box.clientWidth || 320, H = 260, R = new THREE.WebGLRenderer({ antialias: true }), V3 = THREE.Vector3, cy0 = A.cy ?? .55, dist = A.d || 3.6;
   R.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); R.setSize(W, H); R.setClearColor(0x111418); R.domElement.className = 'dm'; box.innerHTML = ''; box.appendChild(R.domElement);
   const S = new THREE.Scene(), C = new THREE.PerspectiveCamera(40, W / H, .1, 50);
   S.add(new THREE.AmbientLight(0xffffff, .75)); const dl = new THREE.DirectionalLight(0xffffff, .7); dl.position.set(2, 4, 3); S.add(dl);
   const cy = new THREE.CylinderGeometry(1, 1, 1, 14), add = (g, c) => { const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: c })); S.add(m); return m; };
   const fl = add(new THREE.CircleGeometry(1.7, 48), 0x1d2229); fl.rotation.x = -Math.PI / 2; fl.position.x = A.cx;
-  const NC = 0x3ddc97, FC = 0x2a9d6e, DEF = [['hip', 0, 'sho', 0, .12, NC], ['hip', .1, 'kn', .1, .075, NC], ['kn', .1, 'an', .1, .06, NC], ['hip', -.1, 'kf', -.1, .075, FC], ['kf', -.1, 'af', -.1, .06, FC],
-    ['sho', .2, 'el', .2, .05, NC], ['el', .2, 'hd', .2, .045, NC], ['sho', -.2, 'el', -.2, .05, FC], ['el', -.2, 'hd', -.2, .045, FC], ['hip', -.1, 'hip', .1, .075, NC], ['sho', -.2, 'sho', .2, .06, NC]];
-  const limbs = DEF.map(d => add(cy, d[5])), head = add(new THREE.SphereGeometry(.11, 16, 12), 0xeeeeee);
-  const eq = A.eq == 'b' ? [add(cy, 0xaaaaaa), add(cy, 0x777777), add(cy, 0x777777)] : A.eq == 'd' ? [add(cy, 0xaaaaaa), add(cy, 0xaaaaaa)] : [];
-  if (A.bn) { const b = add(new THREE.BoxGeometry(1, 1, 1), 0x39424d); b.scale.set(A.bn[2], .1, .4); b.position.set(A.bn[0], A.bn[1] - .05, 0); }
+  const NC = 0x3ddc97, FC = 0x2a9d6e, DEF = [['hip0', 'sho0', .12, NC], ['hipN', 'knN', .075, NC], ['knN', 'anN', .06, NC], ['hipF', 'knF', .075, FC], ['knF', 'anF', .06, FC],
+    ['shoN', 'elN', .05, NC], ['elN', 'hdN', .045, NC], ['shoF', 'elF', .05, FC], ['elF', 'hdF', .045, FC], ['hipF', 'hipN', .075, NC], ['shoF', 'shoN', .06, NC]];
+  const limbs = DEF.map(d => add(cy, d[3])), head = add(new THREE.SphereGeometry(.11, 16, 12), 0xeeeeee);
+  (A.bx || []).forEach(b => { const m = add(new THREE.BoxGeometry(1, 1, 1), b[6] ?? 0x39424d); m.scale.set(b[2], b[3], b[4]); m.position.set(b[0], b[1], b[7] || 0); m.rotation.z = (b[5] || 0) * Math.PI / 180; });
+  const sgM = (A.sg || []).map(g => add(cy, g[3])), fwM = (A.fw || []).map(f => { const m = add(new THREE.BoxGeometry(1, 1, 1), f[7]); m.scale.set(f[3], f[4], f[5]); m.rotation.z = f[6] * Math.PI / 180; return m; });
   const seg = (m, a, b, r) => { const d = new V3().subVectors(b, a), l = d.length() || 1e-3; m.position.copy(a).addScaledVector(d, .5); m.scale.set(r, l, r); m.quaternion.setFromUnitVectors(new V3(0, 1, 0), d.divideScalar(l)); };
-  const P3 = (j, z) => new V3(j[0], j[1], z);
+  const P3 = p => new V3(p[0], p[1], p[2]);
   let on = true, auto = true, dr = 0; const t0 = performance.now();
   R.domElement.onpointermove = e => { if (e.buttons) { dr += e.movementX * .012; auto = false; } };
   (function loop() {
     if (!on) return; requestAnimationFrame(loop);
-    const t = (performance.now() - t0) / 1000, two = A.P.length > 1, J = joints(pose(A.P[0], A.P[two ? 1 : 0], two ? .5 - .5 * Math.cos(t * 1.6) : 0));
-    DEF.forEach((d, i) => seg(limbs[i], P3(J[d[0]], d[1]), P3(J[d[2]], d[3]), d[4]));
-    head.position.set(J.head[0], J.head[1], 0);
-    if (A.eq == 'd') eq.forEach((m, i) => { m.rotation.x = Math.PI / 2; m.scale.set(.05, .2, .05); m.position.set(J.hd[0], J.hd[1], i ? -.2 : .2); });
-    if (A.eq == 'b') { eq.forEach(m => m.rotation.x = Math.PI / 2); eq[0].scale.set(.022, 1.1, .022); eq[0].position.set(J.hd[0], J.hd[1], 0); [1, 2].forEach(i => { eq[i].scale.set(.13, .04, .13); eq[i].position.set(J.hd[0], J.hd[1], i == 1 ? .5 : -.5); }); }
+    const t = (performance.now() - t0) / 1000, two = A.P.length > 1, J = joints(pose(A.P[0], A.P[two ? 1 : 0], two ? .5 - .5 * Math.cos(t * (A.sp || 1.6)) : 0));
+    DEF.forEach((d, i) => seg(limbs[i], P3(J[d[0]]), P3(J[d[1]]), d[2]));
+    head.position.set(J.head[0], J.head[1], J.head[2]);
+    const rs = p => typeof p == 'string' ? J[p] : typeof p[0] == 'string' ? [J[p[0]][0], J[p[0]][1], J[p[0]][2] + p[1]] : p;
+    (A.sg || []).forEach((g, i) => seg(sgM[i], P3(rs(g[0])), P3(rs(g[1])), g[2]));
+    (A.fw || []).forEach((f, i) => fwM[i].position.set(J[f[0]][0] + f[1], J[f[0]][1] + f[2], 0));
     const th = (auto ? Math.sin(t * .4) : 0) + dr;
-    C.position.set(A.cx + 3.6 * Math.sin(th), 1.2, 3.6 * Math.cos(th)); C.lookAt(A.cx, .55, 0); R.render(S, C);
+    C.position.set(A.cx + dist * Math.sin(th), cy0 + .65, dist * Math.cos(th)); C.lookAt(A.cx, cy0, 0); R.render(S, C);
   })();
   DM = { stop() { on = false; R.dispose(); } };
 }
