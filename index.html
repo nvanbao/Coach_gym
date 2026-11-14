@@ -1,7 +1,9 @@
 <!doctype html>
 <html lang="vi"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0d0f12"><title>Gym Coach</title>
+<meta name="theme-color" content="#0d0f12">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="apple-mobile-web-app-title" content="Gym Coach"><title>Gym Coach</title>
 <style>
 :root{--bg:#0d0f12;--c:#171a1f;--a:#3ddc97;--t:#eee;--m:#9aa3ad}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:15px/1.45 system-ui,sans-serif;padding-bottom:76px}
@@ -32,21 +34,44 @@ canvas{width:100%;border-radius:10px;background:#000}
 <script>
 const $ = s => document.querySelector(s), V = $('#v');
 // ---- Tài khoản và đồng bộ (Firebase, gói Spark miễn phí, không hết hạn). Dán firebaseConfig vào FB_CONFIG; để null = chế độ lưu trên máy này ----
-const FB_CONFIG = null; // ví dụ: { apiKey: '...', authDomain: 'ten-du-an.firebaseapp.com', projectId: 'ten-du-an', appId: '...' }
-let KEY = 'gym', USER = null, DB = null, AUTH = null, dirty = false, canPush = false, st8 = '', svT;
+const FB_CONFIG =  apiKey: "AIzaSyAJ9Ma7jtcyCvrEnf87R0uzdOlXt7zuel0",
+  authDomain: "gym-coach-nvanbao.firebaseapp.com",
+  projectId: "gym-coach-nvanbao",
+  storageBucket: "gym-coach-nvanbao.firebasestorage.app",
+  messagingSenderId: "137992564099",
+  appId: "1:137992564099:web:35eab8fa88c0181e985ab6" ; // ví dụ: { apiKey: '...', authDomain: 'ten-du-an.firebaseapp.com', projectId: 'ten-du-an', appId: '...' }
+let KEY = 'gym', USER = null, DB = null, AUTH = null, dirty = false, canPush = false, st8 = '', svT, LASTEM = '', rev = 0;
 const norm = d => { d = d && typeof d == 'object' ? d : {}; d.p = d.p || null; d.w = d.w || []; d.s = d.s || []; d.c = d.c || []; d.adj = d.adj || 0; d.ref = d.ref || {}; return d; };
 let D = {}; try { D = JSON.parse(localStorage.gym || '{}'); } catch (e) {}
 D = norm(D);
 const sync = m => { st8 = m; const e = $('#sync'); if (e) e.textContent = m; };
 const uref = () => DB.collection('users').doc(USER.uid);
+// Chọn bản dữ liệu khi đăng nhập: cloud = {json, ts} | null; st = {dirty: có sửa chưa đồng bộ, lastSync: mốc đồng bộ gần nhất}
+function pickData(cloud, loc, st) {
+  if (!cloud) return { src: loc ? 'local' : 'none' };
+  if (loc && st.dirty && cloud.ts <= st.lastSync) return { src: 'local' };      // sửa lúc offline, máy chủ chưa đổi: giữ bản trên máy rồi đẩy lên
+  return { src: 'cloud', conflict: !!(loc && st.dirty) };                        // máy chủ mới hơn: lấy bản máy chủ, bản sửa offline được giữ dự phòng
+}
 async function push() {
   if (!DB || !USER || !dirty || !canPush) return; sync('Đang đồng bộ…');
-  try { await uref().set({ json: JSON.stringify(D), updated_at: Date.now() }); dirty = false; sync('Đã đồng bộ'); }
-  catch (e) { sync('Chưa đồng bộ được, sẽ thử lại khi có mạng'); }
+  const ts = Date.now(), r = rev;
+  try {
+    await uref().set({ json: JSON.stringify(D), updated_at: ts });
+    localStorage[KEY + '_s'] = ts;
+    if (r == rev) { dirty = false; localStorage.removeItem(KEY + '_d'); sync('Đã đồng bộ'); } else { clearTimeout(svT); svT = setTimeout(push, 300); }
+  } catch (e) { sync('Chưa đồng bộ được, sẽ thử lại khi có mạng'); }
 }
-const save = () => { try { localStorage[KEY] = JSON.stringify(D); } catch (e) {} if (DB && USER) { dirty = true; clearTimeout(svT); svT = setTimeout(push, 800); } };
-addEventListener('online', push);
+const save = () => { rev++; try { localStorage[KEY] = JSON.stringify(D); if (DB && USER) localStorage[KEY + '_d'] = '1'; } catch (e) {} if (DB && USER) { dirty = true; clearTimeout(svT); svT = setTimeout(push, 800); } };
+async function reconnect() { // đang dùng offline, có mạng lại: chỉ đẩy lên khi máy chủ chưa bị đổi từ lần đồng bộ cuối
+  if (!DB || !USER || canPush) return;
+  try {
+    const doc = await uref().get(), ts = doc.exists ? (doc.data().updated_at || 0) : 0;
+    if (ts <= (+localStorage[KEY + '_s'] || 0)) { canPush = true; dirty = true; push(); } else sync('Máy chủ có dữ liệu mới hơn, hãy đăng xuất rồi đăng nhập lại để tải về');
+  } catch (e) {}
+}
+addEventListener('online', () => { push(); reconnect(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { clearTimeout(svT); push(); } });
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
 const today = () => new Date().toISOString().slice(0, 10);
 // Hệ số vận động NGOÀI giờ tập theo công việc (đã tách riêng buổi tập)
 const JOBS = [['Văn phòng / kế toán / lập trình (ngồi nhiều)', 1.30], ['Sinh viên (học, ít di chuyển)', 1.35], ['Tài xế (ngồi lái)', 1.35],
@@ -91,7 +116,7 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => go(b.data
 const T = {};
 T.profile = () => {
   const p = Object.assign({ bud: 'mid', cap: '' }, D.p || { sex: 'm', age: 21, h: 170, w: 65, fat: '', job: 0, n: 4, exp: 0, eq: 'gym', goal: 'lean', allergy: '', injury: '', time: '18:00' });
-  V.innerHTML = `${acctBar()}<h2>Hồ sơ của bạn</h2><div class=card>
+  V.innerHTML = `${acctBar()}${backupBar()}<h2>Hồ sơ của bạn</h2><div class=card>
   <div class=r2><div><label>Giới tính</label><select id=sex><option value=m>Nam<option value=f>Nữ</select></div>
   <div><label>Tuổi</label><input id=age type=number></div>
   <div><label>Chiều cao (cm)</label><input id=h type=number></div><div><label>Cân nặng (kg)</label><input id=w type=number step=.1></div></div>
@@ -514,18 +539,52 @@ T.log = () => {
   w.forEach((x, i) => { const X = 20 + i * 560 / (w.length - 1), Y = 140 - (x.kg - mn) / (mx - mn) * 120; i ? c.lineTo(X, Y) : c.moveTo(X, Y); }); c.stroke();
   c.fillStyle = '#aaa'; c.font = '14px sans-serif'; c.fillText(mx.toFixed(1), 2, 14); c.fillText(mn.toFixed(1), 2, 158);
 };
-// ---------------- Đăng nhập bằng tài khoản Google (Gmail) ----------------
+// ---------------- Đăng nhập (email + mật khẩu; trên web có thêm Google) ----------------
+const isNative = () => !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
+const isStandalone = () => !!(navigator.standalone || (matchMedia && matchMedia('(display-mode: standalone)').matches));
 const acctBar = () => DB && USER ? `<div class=card style="display:flex;gap:10px;align-items:center;justify-content:space-between"><div><div class=mut>Tài khoản</div><b>${USER.email}</b><div class=mut id=sync>${st8 || 'Đã đồng bộ'}</div></div><button class=g style="width:auto;margin:0" onclick="logout()">Đăng xuất</button></div>` : '';
+const backupBar = () => `<div class=card><h3>Sao lưu dữ liệu</h3><div class=r2><button class=g onclick="exportData()">Sao chép bản sao lưu</button><button class=g onclick="importData()">Khôi phục từ bản sao lưu</button></div><textarea id=bk rows=3 placeholder="Dán bản sao lưu vào đây để khôi phục" style="width:100%;margin-top:8px"></textarea><p class=mut id=bkm style="margin:6px 0 0"></p></div>`;
+async function exportData() {
+  const t = JSON.stringify(D);
+  try { await navigator.clipboard.writeText(t); $('#bkm').textContent = 'Đã sao chép. Hãy dán vào Ghi chú hoặc gửi cho chính mình để cất giữ.'; }
+  catch (e) { $('#bk').value = t; $('#bk').select(); $('#bkm').textContent = 'Hãy sao chép đoạn văn bản trong ô rồi cất giữ.'; }
+}
+function importData() {
+  try {
+    const d = JSON.parse($('#bk').value.trim()); if (!d || typeof d != 'object' || !('p' in d)) throw 0;
+    if (!confirm('Khôi phục sẽ thay toàn bộ dữ liệu hiện tại. Tiếp tục?')) return;
+    D = norm(d); save(); Object.keys(D.ref).forEach(saveRef); go('profile');
+  } catch (e) { $('#bkm').textContent = 'Bản sao lưu không hợp lệ.'; }
+}
 function authUI(html) { let a = $('#auth'); if (!a) { a = document.createElement('div'); a.id = 'auth'; document.body.appendChild(a); } a.innerHTML = `<div class=box>${html}</div>`; }
 function showLogin(msg = '') {
   stopCam(); closeDemo();
-  authUI(`<h2>Đăng nhập Gym Coach</h2><div class=card><p class=mut style="margin:0 0 6px">Mỗi người dùng một tài khoản Google (Gmail) riêng. Dữ liệu thể trạng, kế hoạch, nhật ký và rep mẫu chỉ mình bạn xem được.</p>
-  <button onclick="googleLogin()">Đăng nhập bằng Google</button><p class=warn id=am>${msg}</p><p class=mut>Nếu mở từ Zalo hoặc Facebook mà không đăng nhập được, hãy mở link bằng Safari hoặc Chrome.</p></div>`);
+  authUI(`<h2>Đăng nhập Gym Coach</h2><div class=card><p class=mut style="margin:0 0 6px">Mỗi người một tài khoản riêng. Dữ liệu thể trạng, kế hoạch, nhật ký và rep mẫu chỉ mình bạn xem được và được giữ lại cho lần mở sau.</p>
+  <label>Email (Gmail)</label><input id=em type=email autocomplete=email placeholder="ten@gmail.com" value="${LASTEM}">
+  <label>Mật khẩu (từ 6 ký tự)</label><input id=pw type=password autocomplete=current-password>
+  <button onclick="emailLogin(false)">Đăng nhập</button><button class=g onclick="emailLogin(true)">Tạo tài khoản mới</button><button class=g onclick="resetPw()">Quên mật khẩu</button>
+  ${isNative() || isStandalone() ? '' : '<button class=g onclick="googleLogin()">Đăng nhập bằng Google</button>'}<p class=warn id=am>${msg}</p></div>`);
+}
+const authErr = e => ({ 'auth/invalid-credential': 'Sai email hoặc mật khẩu.', 'auth/wrong-password': 'Sai email hoặc mật khẩu.', 'auth/user-not-found': 'Email này chưa có tài khoản, hãy bấm Tạo tài khoản mới.',
+  'auth/email-already-in-use': 'Email này đã có tài khoản, hãy bấm Đăng nhập.', 'auth/weak-password': 'Mật khẩu quá yếu, cần từ 6 ký tự.', 'auth/invalid-email': 'Email chưa đúng.',
+  'auth/network-request-failed': 'Không có mạng, hãy thử lại khi có kết nối.', 'auth/too-many-requests': 'Thử quá nhiều lần, chờ một lúc rồi thử lại.',
+  'auth/operation-not-allowed': 'Chưa bật phương thức đăng nhập này trong Firebase (Authentication, Sign-in method).', 'auth/popup-closed-by-user': 'Bạn đã đóng cửa sổ đăng nhập.',
+  'auth/unauthorized-domain': 'Tên miền này chưa được cho phép trong Firebase (Authentication, Settings, Authorized domains).', 'auth/popup-blocked': 'Trình duyệt chặn cửa sổ đăng nhập, hãy cho phép rồi thử lại.' })[e.code] || 'Lỗi: ' + e.message;
+async function emailLogin(create) {
+  const em = $('#em').value.trim().toLowerCase(), pw = $('#pw').value, m = $('#am');
+  if (!/^\S+@\S+\.\S+$/.test(em)) { m.textContent = 'Email chưa đúng.'; return; }
+  if (pw.length < 6) { m.textContent = 'Mật khẩu cần từ 6 ký tự.'; return; }
+  LASTEM = em; m.textContent = 'Đang xử lý…';
+  try { create ? await AUTH.createUserWithEmailAndPassword(em, pw) : await AUTH.signInWithEmailAndPassword(em, pw); } // xong thì onAuthStateChanged xử lý tiếp
+  catch (e) { m.textContent = authErr(e); }
+}
+async function resetPw() {
+  const em = $('#em').value.trim().toLowerCase(), m = $('#am'); if (!/^\S+@\S+\.\S+$/.test(em)) { m.textContent = 'Nhập email trước rồi bấm Quên mật khẩu.'; return; }
+  try { await AUTH.sendPasswordResetEmail(em); m.textContent = 'Đã gửi email đặt lại mật khẩu, kiểm tra cả mục Spam.'; } catch (e) { m.textContent = authErr(e); }
 }
 async function googleLogin() {
   const m = $('#am'); m.textContent = 'Đang mở cửa sổ đăng nhập…';
-  try { await AUTH.signInWithPopup(new firebase.auth.GoogleAuthProvider()); } // đăng nhập xong onAuthStateChanged sẽ xử lý tiếp
-  catch (e) { m.textContent = e.code == 'auth/popup-closed-by-user' ? 'Bạn đã đóng cửa sổ đăng nhập.' : e.code == 'auth/unauthorized-domain' ? 'Tên miền này chưa được cho phép trong Firebase (Authentication, Settings, Authorized domains).' : e.code == 'auth/popup-blocked' ? 'Trình duyệt chặn cửa sổ đăng nhập, hãy cho phép cửa sổ bật lên rồi thử lại.' : 'Đăng nhập không được: ' + e.message; }
+  try { await AUTH.signInWithPopup(new firebase.auth.GoogleAuthProvider()); } catch (e) { m.textContent = authErr(e); }
 }
 async function afterLogin(u) {
   USER = u; KEY = 'gym_' + u.uid; authUI('<p class=mut style="text-align:center;margin-top:35vh">Đang tải dữ liệu của bạn…</p>');
@@ -533,8 +592,14 @@ async function afterLogin(u) {
   let doc = null, err = false;
   try { doc = await uref().get(); } catch (e) { err = true; }
   canPush = !err;
-  if (doc && doc.exists && doc.data().json) { try { D = norm(JSON.parse(doc.data().json)); } catch (e) { D = norm(loc); canPush = false; st8 = 'Dữ liệu trên máy chủ bị lỗi, chưa ghi đè'; } }
-  else if (err) { D = norm(loc); st8 = 'Chưa kết nối được máy chủ, đang dùng bản lưu trên máy'; }
+  const cd = doc && doc.exists ? doc.data() : null, cloud = cd && cd.json ? { json: cd.json, ts: cd.updated_at || 0 } : null;
+  const pk = pickData(cloud, loc, { dirty: localStorage[KEY + '_d'] == '1', lastSync: +localStorage[KEY + '_s'] || 0 });
+  if (err) { D = norm(loc); st8 = 'Chưa kết nối được máy chủ, đang dùng bản lưu trên máy'; }
+  else if (pk.src == 'cloud') {
+    try { if (pk.conflict) localStorage[KEY + '_conflict'] = JSON.stringify(loc); D = norm(JSON.parse(cloud.json)); localStorage[KEY + '_s'] = cloud.ts; localStorage.removeItem(KEY + '_d'); }
+    catch (e) { D = norm(loc); canPush = false; st8 = 'Dữ liệu trên máy chủ bị lỗi, chưa ghi đè'; }
+  }
+  else if (pk.src == 'local') D = norm(loc);
   else { // tài khoản mới: có thể chuyển dữ liệu cũ trên máy này sang
     let old = null; try { old = JSON.parse(localStorage.gym || 'null'); } catch (e) {}
     D = norm(old && old.p && confirm('Máy này có dữ liệu cũ chưa gắn tài khoản. Chuyển vào tài khoản ' + u.email + '?') ? old : loc);
@@ -542,7 +607,8 @@ async function afterLogin(u) {
   if (canPush) { // rep mẫu lưu riêng theo từng người, từng bài
     try { const r = await uref().collection('ref').get(); if (!r.empty) { D.ref = {}; r.forEach(x => { const v = x.data(); D.ref[x.id] = { min: v.min, max: v.max }; }); } else Object.keys(D.ref).forEach(saveRef); } catch (e) {}
   }
-  if (canPush) { dirty = true; save(); push(); } else save();
+  const cache = () => { try { localStorage[KEY] = JSON.stringify(D); } catch (e) {} };
+  if (canPush && !(pk.src == 'cloud' && cloud)) { save(); push(); } else cache(); // chỉ ghi lên máy chủ khi dữ liệu trên máy là bản đúng
   const a = $('#auth'); if (a) a.remove();
   go(D.p ? 'plan' : 'profile');
 }
@@ -560,7 +626,7 @@ async function delRef() {
 }
 async function logout() {
   if (dirty && !confirm('Còn dữ liệu chưa đồng bộ, đăng xuất bây giờ có thể mất. Vẫn đăng xuất?')) return;
-  try { localStorage.removeItem(KEY); } catch (e) {}
+  try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + '_d'); localStorage.removeItem(KEY + '_s'); } catch (e) {}
   USER = null; KEY = 'gym'; dirty = false; canPush = false; D = norm({});
   await AUTH.signOut(); showLogin();
 }
@@ -575,5 +641,6 @@ function boot() {
     first = false;
   });
 }
+if ('serviceWorker' in navigator && !isNative() && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
 boot();
 </script></body></html>
