@@ -2,6 +2,8 @@
 <html lang="vi"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0d0f12">
+<script>window.addEventListener('error', e => { if (!e.message) return; const d = document.createElement('div'); d.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99;background:#7a1f1f;color:#fff;padding:10px;font:13px/1.4 monospace;white-space:pre-wrap'; d.textContent = 'Lỗi: ' + e.message + (e.lineno ? ' (dòng ' + e.lineno + ')' : '') + '\nChạm vào đây để ẩn.'; d.onclick = () => d.remove(); const add = () => document.body.appendChild(d); document.body ? add() : document.addEventListener('DOMContentLoaded', add); });</script>
+<script src="firebase-config.js"></script>
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="apple-mobile-web-app-title" content="Gym Coach"><title>Gym Coach</title>
 <style>
@@ -34,12 +36,7 @@ canvas{width:100%;border-radius:10px;background:#000}
 <script>
 const $ = s => document.querySelector(s), V = $('#v');
 // ---- Tài khoản và đồng bộ (Firebase, gói Spark miễn phí, không hết hạn). Dán firebaseConfig vào FB_CONFIG; để null = chế độ lưu trên máy này ----
-const FB_CONFIG = { apiKey: "AIzaSyAJ9Ma7jtcyCvrEnf87R0uzdOlXt7zuel0",
-  authDomain: "gym-coach-nvanbao.firebaseapp.com",
-  projectId: "gym-coach-nvanbao",
-  storageBucket: "gym-coach-nvanbao.firebasestorage.app",
-  messagingSenderId: "137992564099",
-  appId: "1:137992564099:web:35eab8fa88c0181e985ab6"} ; // ví dụ: { apiKey: '...', authDomain: 'ten-du-an.firebaseapp.com', projectId: 'ten-du-an', appId: '...' }
+const FB_CONFIG = window.FB_CONFIG && window.FB_CONFIG.apiKey && !/DÁN/.test(JSON.stringify(window.FB_CONFIG)) ? window.FB_CONFIG : null; // lấy từ firebase-config.js; null = chế độ lưu trên máy
 let KEY = 'gym', USER = null, DB = null, AUTH = null, dirty = false, canPush = false, st8 = '', svT, LASTEM = '', rev = 0;
 const norm = d => { d = d && typeof d == 'object' ? d : {}; d.p = d.p || null; d.w = d.w || []; d.s = d.s || []; d.c = d.c || []; d.adj = d.adj || 0; d.ref = d.ref || {}; return d; };
 let D = {}; try { D = JSON.parse(localStorage.gym || '{}'); } catch (e) {}
@@ -540,9 +537,13 @@ T.log = () => {
   c.fillStyle = '#aaa'; c.font = '14px sans-serif'; c.fillText(mx.toFixed(1), 2, 14); c.fillText(mn.toFixed(1), 2, 158);
 };
 // ---------------- Đăng nhập (email + mật khẩu; trên web có thêm Google) ----------------
+const FAKE = '@gymcoach.example.com'; // tên đăng nhập được đổi thành email nội bộ (không gửi thư tới đây); ai nhập email thật thì dùng email thật
+const toEmail = v => { v = v.trim().toLowerCase(); return v.includes('@') ? v : v + FAKE; };
+const shownName = u => u.email && u.email.endsWith(FAKE) ? u.email.slice(0, -FAKE.length) : u.email;
+const validLogin = v => v.includes('@') ? /^\S+@\S+\.\S+$/.test(v) : /^[a-z0-9._-]{3,20}$/.test(v);
 const isNative = () => !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
 const isStandalone = () => !!(navigator.standalone || (matchMedia && matchMedia('(display-mode: standalone)').matches));
-const acctBar = () => DB && USER ? `<div class=card style="display:flex;gap:10px;align-items:center;justify-content:space-between"><div><div class=mut>Tài khoản</div><b>${USER.email}</b><div class=mut id=sync>${st8 || 'Đã đồng bộ'}</div></div><button class=g style="width:auto;margin:0" onclick="logout()">Đăng xuất</button></div>` : '';
+const acctBar = () => DB && USER ? `<div class=card><div style="display:flex;gap:10px;align-items:center;justify-content:space-between"><div><div class=mut>Tài khoản</div><b>${shownName(USER)}</b><div class=mut id=sync>${st8 || 'Đã đồng bộ'}</div></div><button class=g style="width:auto;margin:0" onclick="logout()">Đăng xuất</button></div><details style="margin-top:8px"><summary class=mut>Đổi mật khẩu</summary><label>Mật khẩu hiện tại</label><input id=op type=password autocomplete=current-password><label>Mật khẩu mới (từ 6 ký tự)</label><input id=np type=password autocomplete=new-password><button class=g onclick="changePw()">Đổi mật khẩu</button><p class=warn id=pwm></p></details></div>` : '';
 const backupBar = () => `<div class=card><h3>Sao lưu dữ liệu</h3><div class=r2><button class=g onclick="exportData()">Sao chép bản sao lưu</button><button class=g onclick="importData()">Khôi phục từ bản sao lưu</button></div><textarea id=bk rows=3 placeholder="Dán bản sao lưu vào đây để khôi phục" style="width:100%;margin-top:8px"></textarea><p class=mut id=bkm style="margin:6px 0 0"></p></div>`;
 async function exportData() {
   const t = JSON.stringify(D);
@@ -559,28 +560,37 @@ function importData() {
 function authUI(html) { let a = $('#auth'); if (!a) { a = document.createElement('div'); a.id = 'auth'; document.body.appendChild(a); } a.innerHTML = `<div class=box>${html}</div>`; }
 function showLogin(msg = '') {
   stopCam(); closeDemo();
-  authUI(`<h2>Đăng nhập Gym Coach</h2><div class=card><p class=mut style="margin:0 0 6px">Mỗi người một tài khoản riêng. Dữ liệu thể trạng, kế hoạch, nhật ký và rep mẫu chỉ mình bạn xem được và được giữ lại cho lần mở sau.</p>
-  <label>Email (Gmail)</label><input id=em type=email autocomplete=email placeholder="ten@gmail.com" value="${LASTEM}">
+  authUI(`<h2>Đăng nhập Gym Coach</h2><div class=card><p class=mut style="margin:0 0 6px">Mỗi người tự đặt tên đăng nhập và mật khẩu riêng. Dữ liệu thể trạng, kế hoạch, nhật ký và rep mẫu chỉ mình bạn xem được và được giữ lại cho lần mở sau.</p>
+  <label>Tên đăng nhập</label><input id=em autocomplete=username autocapitalize=none autocorrect=off spellcheck=false placeholder="ví dụ: nguyenvana" value="${LASTEM}">
   <label>Mật khẩu (từ 6 ký tự)</label><input id=pw type=password autocomplete=current-password>
-  <button onclick="emailLogin(false)">Đăng nhập</button><button class=g onclick="emailLogin(true)">Tạo tài khoản mới</button><button class=g onclick="resetPw()">Quên mật khẩu</button>
-  ${isNative() || isStandalone() ? '' : '<button class=g onclick="googleLogin()">Đăng nhập bằng Google</button>'}<p class=warn id=am>${msg}</p></div>`);
+  <button onclick="emailLogin(false)">Đăng nhập</button><button class=g onclick="emailLogin(true)">Tạo tài khoản mới</button>
+  <p class=warn id=am>${msg}</p>
+  <p class=mut>Tên đăng nhập gồm 3 đến 20 ký tự: chữ thường không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang. Hãy ghi nhớ mật khẩu, vì tài khoản dạng tên đăng nhập không có email để lấy lại. Nếu muốn có chức năng quên mật khẩu, hãy nhập email thật vào ô tên đăng nhập khi tạo tài khoản.</p>
+  <button class=g onclick="resetPw()">Quên mật khẩu (chỉ với tài khoản dùng email thật)</button></div>`);
 }
-const authErr = e => ({ 'auth/invalid-credential': 'Sai email hoặc mật khẩu.', 'auth/wrong-password': 'Sai email hoặc mật khẩu.', 'auth/user-not-found': 'Email này chưa có tài khoản, hãy bấm Tạo tài khoản mới.',
-  'auth/email-already-in-use': 'Email này đã có tài khoản, hãy bấm Đăng nhập.', 'auth/weak-password': 'Mật khẩu quá yếu, cần từ 6 ký tự.', 'auth/invalid-email': 'Email chưa đúng.',
+const authErr = e => ({ 'auth/invalid-credential': 'Sai tên đăng nhập hoặc mật khẩu.', 'auth/wrong-password': 'Sai tên đăng nhập hoặc mật khẩu.', 'auth/user-not-found': 'Tên đăng nhập này chưa có tài khoản, hãy bấm Tạo tài khoản mới.', 'auth/requires-recent-login': 'Hãy đăng xuất, đăng nhập lại rồi thử đổi mật khẩu.',
+  'auth/email-already-in-use': 'Tên đăng nhập này đã có người dùng, hãy chọn tên khác hoặc bấm Đăng nhập.', 'auth/weak-password': 'Mật khẩu quá yếu, cần từ 6 ký tự.', 'auth/invalid-email': 'Tên đăng nhập hoặc email chưa đúng.',
   'auth/network-request-failed': 'Không có mạng, hãy thử lại khi có kết nối.', 'auth/too-many-requests': 'Thử quá nhiều lần, chờ một lúc rồi thử lại.',
   'auth/operation-not-allowed': 'Chưa bật phương thức đăng nhập này trong Firebase (Authentication, Sign-in method).', 'auth/popup-closed-by-user': 'Bạn đã đóng cửa sổ đăng nhập.',
   'auth/unauthorized-domain': 'Tên miền này chưa được cho phép trong Firebase (Authentication, Settings, Authorized domains).', 'auth/popup-blocked': 'Trình duyệt chặn cửa sổ đăng nhập, hãy cho phép rồi thử lại.' })[e.code] || 'Lỗi: ' + e.message;
 async function emailLogin(create) {
-  const em = $('#em').value.trim().toLowerCase(), pw = $('#pw').value, m = $('#am');
-  if (!/^\S+@\S+\.\S+$/.test(em)) { m.textContent = 'Email chưa đúng.'; return; }
+  const raw = $('#em').value.trim().toLowerCase(), pw = $('#pw').value, m = $('#am');
+  if (!validLogin(raw)) { m.textContent = 'Tên đăng nhập gồm 3 đến 20 ký tự: chữ thường không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang (hoặc nhập một email hợp lệ).'; return; }
   if (pw.length < 6) { m.textContent = 'Mật khẩu cần từ 6 ký tự.'; return; }
-  LASTEM = em; m.textContent = 'Đang xử lý…';
+  LASTEM = raw; m.textContent = 'Đang xử lý…'; const em = toEmail(raw);
   try { create ? await AUTH.createUserWithEmailAndPassword(em, pw) : await AUTH.signInWithEmailAndPassword(em, pw); } // xong thì onAuthStateChanged xử lý tiếp
   catch (e) { m.textContent = authErr(e); }
 }
 async function resetPw() {
-  const em = $('#em').value.trim().toLowerCase(), m = $('#am'); if (!/^\S+@\S+\.\S+$/.test(em)) { m.textContent = 'Nhập email trước rồi bấm Quên mật khẩu.'; return; }
-  try { await AUTH.sendPasswordResetEmail(em); m.textContent = 'Đã gửi email đặt lại mật khẩu, kiểm tra cả mục Spam.'; } catch (e) { m.textContent = authErr(e); }
+  const raw = $('#em').value.trim().toLowerCase(), m = $('#am');
+  if (!raw.includes('@')) { m.textContent = 'Tài khoản dạng tên đăng nhập không đặt lại được qua email. Chỉ tài khoản tạo bằng email thật mới có chức năng này.'; return; }
+  try { await AUTH.sendPasswordResetEmail(raw); m.textContent = 'Nếu email này có tài khoản, thư đặt lại mật khẩu đã được gửi, kiểm tra cả mục Spam.'; } catch (e) { m.textContent = authErr(e); }
+}
+async function changePw() {
+  const op = $('#op').value, np = $('#np').value, m = $('#pwm');
+  if (np.length < 6) { m.textContent = 'Mật khẩu mới cần từ 6 ký tự.'; return; }
+  try { await USER.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(USER.email, op)); await USER.updatePassword(np); m.textContent = 'Đã đổi mật khẩu.'; $('#op').value = ''; $('#np').value = ''; }
+  catch (e) { m.textContent = authErr(e); }
 }
 async function googleLogin() {
   const m = $('#am'); m.textContent = 'Đang mở cửa sổ đăng nhập…';
@@ -602,7 +612,7 @@ async function afterLogin(u) {
   else if (pk.src == 'local') D = norm(loc);
   else { // tài khoản mới: có thể chuyển dữ liệu cũ trên máy này sang
     let old = null; try { old = JSON.parse(localStorage.gym || 'null'); } catch (e) {}
-    D = norm(old && old.p && confirm('Máy này có dữ liệu cũ chưa gắn tài khoản. Chuyển vào tài khoản ' + u.email + '?') ? old : loc);
+    D = norm(old && old.p && confirm('Máy này có dữ liệu cũ chưa gắn tài khoản. Chuyển vào tài khoản ' + shownName(u) + '?') ? old : loc);
   }
   if (canPush) { // rep mẫu lưu riêng theo từng người, từng bài
     try { const r = await uref().collection('ref').get(); if (!r.empty) { D.ref = {}; r.forEach(x => { const v = x.data(); D.ref[x.id] = { min: v.min, max: v.max }; }); } else Object.keys(D.ref).forEach(saveRef); } catch (e) {}
