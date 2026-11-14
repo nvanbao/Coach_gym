@@ -1,0 +1,39 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths: ['index.html', 'scripts/**', 'capacitor.config.json', 'package.json', 'signing/**', '.github/workflows/build-apk.yml']
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm ci
+      - run: npm run build:www
+      - run: npx cap add android
+      - run: node scripts/patch-android.mjs
+      - run: npx cap sync android
+      # Dùng cố định một khóa ký: cùng khóa + versionCode tăng dần thì APK mới cài đè lên bản cũ và giữ nguyên dữ liệu
+      - name: Use fixed signing key
+        run: |
+          mkdir -p ~/.android
+          cp signing/debug.keystore ~/.android/debug.keystore
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GymCoach-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
