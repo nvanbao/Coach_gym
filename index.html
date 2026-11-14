@@ -34,12 +34,12 @@ canvas{width:100%;border-radius:10px;background:#000}
 <script>
 const $ = s => document.querySelector(s), V = $('#v');
 // ---- Tài khoản và đồng bộ (Firebase, gói Spark miễn phí, không hết hạn). Dán firebaseConfig vào FB_CONFIG; để null = chế độ lưu trên máy này ----
-const FB_CONFIG =  apiKey: "AIzaSyAJ9Ma7jtcyCvrEnf87R0uzdOlXt7zuel0",
+const FB_CONFIG = { apiKey: "AIzaSyAJ9Ma7jtcyCvrEnf87R0uzdOlXt7zuel0",
   authDomain: "gym-coach-nvanbao.firebaseapp.com",
   projectId: "gym-coach-nvanbao",
   storageBucket: "gym-coach-nvanbao.firebasestorage.app",
   messagingSenderId: "137992564099",
-  appId: "1:137992564099:web:35eab8fa88c0181e985ab6" ; // ví dụ: { apiKey: '...', authDomain: 'ten-du-an.firebaseapp.com', projectId: 'ten-du-an', appId: '...' }
+  appId: "1:137992564099:web:35eab8fa88c0181e985ab6"} ; // ví dụ: { apiKey: '...', authDomain: 'ten-du-an.firebaseapp.com', projectId: 'ten-du-an', appId: '...' }
 let KEY = 'gym', USER = null, DB = null, AUTH = null, dirty = false, canPush = false, st8 = '', svT, LASTEM = '', rev = 0;
 const norm = d => { d = d && typeof d == 'object' ? d : {}; d.p = d.p || null; d.w = d.w || []; d.s = d.s || []; d.c = d.c || []; d.adj = d.adj || 0; d.ref = d.ref || {}; return d; };
 let D = {}; try { D = JSON.parse(localStorage.gym || '{}'); } catch (e) {}
