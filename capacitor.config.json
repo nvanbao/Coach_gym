@@ -2,5 +2,8 @@
   "appId": "io.github.nvanbao.coachgym",
   "appName": "Gym Coach",
   "webDir": "www",
-  "server": { "androidScheme": "https" }
+  "server": {
+    "url": "https://nvanbao.github.io/Coach_gym/",
+    "errorPath": "offline.html"
+  }
 }

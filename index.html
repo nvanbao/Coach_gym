@@ -651,6 +651,6 @@ function boot() {
     first = false;
   });
 }
-if ('serviceWorker' in navigator && !isNative() && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator && /^https?:/.test(location.protocol) && location.hostname != 'localhost') navigator.serviceWorker.register('sw.js').catch(() => {}); // chạy cả trên web, iPhone và APK tải trang trực tuyến
 boot();
 </script></body></html>

@@ -1,32 +1,13 @@
-// Tạo thư mục www/ từ index.html: tải sẵn các thư viện CDN về lib/ để app chạy được khi không có mạng.
+// App Android chỉ là "khung" mở trang https://nvanbao.github.io/Coach_gym/ (xem capacitor.config.json),
+// nên mỗi lần bạn cập nhật web, app tự có bản mới mà không cần cài lại APK.
+// Thư mục www/ chỉ cần có index.html (Capacitor yêu cầu) và offline.html (hiện khi chưa từng mở app lúc có mạng).
 import fs from 'node:fs';
 
-const LIBS = [
-  ['https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js', 'tf.min.js'],
-  ['https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js', 'pose-detection.min.js'],
-  ['https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', 'three.min.js'],
-  ['https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js', 'firebase-app-compat.js'],
-  ['https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js', 'firebase-auth-compat.js'],
-  ['https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js', 'firebase-firestore-compat.js'],
-];
-
 fs.rmSync('www', { recursive: true, force: true });
-fs.mkdirSync('www/lib', { recursive: true });
-let html = fs.readFileSync('index.html', 'utf8');
-
-for (const [url, name] of LIBS) {
-  if (!html.includes(url)) throw new Error(`index.html không còn dòng script: ${url}`);
-  if (process.env.SKIP_DOWNLOAD === '1') {
-    fs.writeFileSync(`www/lib/${name}`, '/* skipped */');
-  } else {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Tải thất bại ${res.status}: ${url}`);
-    const body = Buffer.from(await res.arrayBuffer());
-    if (body.length < 1000) throw new Error(`File quá nhỏ, có thể lỗi: ${url}`);
-    fs.writeFileSync(`www/lib/${name}`, body);
-  }
-  html = html.replace(url, `lib/${name}`);
-}
-
-fs.writeFileSync('www/index.html', html);
-console.log('OK: đã tạo www/ với', LIBS.length, 'thư viện nội bộ');
+fs.mkdirSync('www', { recursive: true });
+fs.copyFileSync('index.html', 'www/index.html');
+fs.writeFileSync('www/offline.html', `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Gym Coach</title>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0d0f12;color:#e6e8eb;font:16px/1.5 system-ui,sans-serif;text-align:center;padding:24px}
+button{margin-top:16px;background:#3ddc97;color:#000;border:0;border-radius:10px;padding:12px 22px;font-weight:700;font-size:16px}</style></head>
+<body><div><h2>Chưa có kết nối mạng</h2><p>Lần đầu mở Gym Coach cần có mạng để tải app.<br>Sau đó app mở được cả khi không có mạng.</p><button onclick="location.reload()">Thử lại</button></div></body></html>`);
+console.log('OK: đã tạo www/ (index.html, offline.html)');
