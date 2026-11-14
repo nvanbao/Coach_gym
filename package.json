@@ -1,0 +1,14 @@
+{
+  "name": "coach-gym",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Gym Coach - Android APK wrapper (Capacitor)",
+  "scripts": {
+    "build:www": "node scripts/build-www.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "6.2.1",
+    "@capacitor/cli": "6.2.1",
+    "@capacitor/core": "6.2.1"
+  }
+}
