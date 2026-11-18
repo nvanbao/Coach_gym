@@ -30,19 +30,49 @@ canvas{width:100%;border-radius:10px;background:#000}
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 const $ = s => document.querySelector(s), V = $('#v');
-// ---- Tài khoản và đồng bộ (Firebase, gói Spark miễn phí, không hết hạn). Dán firebaseConfig vào FB_CONFIG; để null = chế độ lưu trên máy này ----
-const FB_CONFIG = window.FB_CONFIG && window.FB_CONFIG.apiKey && !/DÁN/.test(JSON.stringify(window.FB_CONFIG)) ? window.FB_CONFIG : null; // lấy từ firebase-config.js; null = chế độ lưu trên máy
-let KEY = 'gym', USER = null, DB = null, AUTH = null, dirty = false, canPush = false, st8 = '', svT, LASTEM = '', rev = 0;
+// ---- Tài khoản và đồng bộ (Firebase gọi qua REST, gói Spark miễn phí, không cần SDK). Cấu hình nằm trong firebase-config.js; không có = chế độ lưu trên máy ----
+const FB_CONFIG = window.FB_CONFIG && window.FB_CONFIG.apiKey && !/DÁN/.test(JSON.stringify(window.FB_CONFIG)) ? window.FB_CONFIG : null;
+let KEY = 'gym', USER = null, SESS = null, DB = false, dirty = false, canPush = false, st8 = '', svT, LASTEM = '', rev = 0;
 const norm = d => { d = d && typeof d == 'object' ? d : {}; d.p = d.p || null; d.w = d.w || []; d.s = d.s || []; d.c = d.c || []; d.adj = d.adj || 0; d.ref = d.ref || {}; return d; };
 let D = {}; try { D = JSON.parse(localStorage.gym || '{}'); } catch (e) {}
 D = norm(D);
+const cloudErr = e => { const c = e && e.code; return c == 'PERMISSION_DENIED' ? 'Firestore chưa cho phép ghi: hãy dán và Publish Rules trong Firebase' : c == 'NO_DB' ? 'Chưa tạo Firestore Database: vào Firebase, Firestore Database, Create database' : (c == 'timeout' || c == 'network' || c == 'UNAVAILABLE') ? 'Chưa kết nối được máy chủ (có thể không có mạng)' : 'Chưa đồng bộ được, sẽ thử lại khi có mạng'; };
 const sync = m => { st8 = m; const e = $('#sync'); if (e) e.textContent = m; };
-const uref = () => DB.collection('users').doc(USER.uid);
+// gọi HTTP có giới hạn thời gian; lỗi trả về dạng {code, message, status}
+async function jf(url, opt, ms = 12000) {
+  let r;
+  try { r = await Promise.race([fetch(url, opt), new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), ms))]); }
+  catch (e) { throw e && e.code == 'timeout' ? e : { code: 'network', message: String(e && e.message || e) }; }
+  const txt = await r.text(); let j = {}; try { j = txt ? JSON.parse(txt) : {}; } catch (e) {}
+  if (!r.ok) {
+    const er = j.error || {}, msg = String(er.message || '');
+    const code = /API key not valid/i.test(msg) ? 'API_KEY_INVALID' : (r.status == 404 && /database.*does not exist/i.test(msg)) ? 'NO_DB' : (er.status && er.status != 'INVALID_ARGUMENT' ? er.status : (msg.split(/[\s:]/)[0] || 'HTTP_' + r.status));
+    throw { code, message: msg, status: r.status };
+  }
+  return j;
+}
+const authCall = (method, body) => jf('https://identitytoolkit.googleapis.com/v1/accounts:' + method + '?key=' + FB_CONFIG.apiKey, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const saveSess = () => { try { localStorage.gym_sess = JSON.stringify(SESS); } catch (e) {} };
+function setSess(j) { SESS = { idToken: j.idToken || j.id_token, refreshToken: j.refreshToken || j.refresh_token, uid: j.localId || j.user_id, email: j.email || (SESS && SESS.email) || '', exp: Date.now() + (+(j.expiresIn || j.expires_in) || 3600) * 1000 - 60000 }; saveSess(); }
+async function token() {
+  if (!SESS) throw { code: 'UNAUTHENTICATED' };
+  if (Date.now() > SESS.exp) setSess(await jf('https://securetoken.googleapis.com/v1/token?key=' + FB_CONFIG.apiKey, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(SESS.refreshToken) }));
+  return SESS.idToken;
+}
+const fsUrl = p => 'https://firestore.googleapis.com/v1/projects/' + FB_CONFIG.projectId + '/databases/(default)/documents' + p;
+async function fsCall(path, method = 'GET', body, query = '') {
+  const tk = await token(), h = { Authorization: 'Bearer ' + tk }; if (body) h['Content-Type'] = 'application/json';
+  return jf(fsUrl(path + query), { method, headers: h, body: body ? JSON.stringify(body) : undefined });
+}
+const num = v => v ? +(v.doubleValue ?? v.integerValue ?? 0) : 0;
+async function getDoc() { // dữ liệu chính của người dùng: {json, ts} hoặc null nếu chưa có
+  try { const j = await fsCall('/users/' + USER.uid), f = j.fields || {}; return f.json && f.json.stringValue ? { json: f.json.stringValue, ts: num(f.updated_at) } : null; }
+  catch (e) { if (e.code == 'NOT_FOUND') return null; throw e; }
+}
+const setDoc = (json, ts) => fsCall('/users/' + USER.uid, 'PATCH', { fields: { json: { stringValue: json }, updated_at: { integerValue: String(ts) } } }, '?updateMask.fieldPaths=json&updateMask.fieldPaths=updated_at');
+async function listRefs() { const j = await fsCall('/users/' + USER.uid + '/ref'); return (j.documents || []).map(d => ({ id: d.name.split('/').pop(), min: num(d.fields.min), max: num(d.fields.max) })); }
 // Chọn bản dữ liệu khi đăng nhập: cloud = {json, ts} | null; st = {dirty: có sửa chưa đồng bộ, lastSync: mốc đồng bộ gần nhất}
 function pickData(cloud, loc, st) {
   if (!cloud) return { src: loc ? 'local' : 'none' };
@@ -53,18 +83,18 @@ async function push() {
   if (!DB || !USER || !dirty || !canPush) return; sync('Đang đồng bộ…');
   const ts = Date.now(), r = rev;
   try {
-    await uref().set({ json: JSON.stringify(D), updated_at: ts });
+    await setDoc(JSON.stringify(D), ts);
     localStorage[KEY + '_s'] = ts;
     if (r == rev) { dirty = false; localStorage.removeItem(KEY + '_d'); sync('Đã đồng bộ'); } else { clearTimeout(svT); svT = setTimeout(push, 300); }
-  } catch (e) { sync('Chưa đồng bộ được, sẽ thử lại khi có mạng'); }
+  } catch (e) { sync(cloudErr(e)); }
 }
 const save = () => { rev++; try { localStorage[KEY] = JSON.stringify(D); if (DB && USER) localStorage[KEY + '_d'] = '1'; } catch (e) {} if (DB && USER) { dirty = true; clearTimeout(svT); svT = setTimeout(push, 800); } };
 async function reconnect() { // đang dùng offline, có mạng lại: chỉ đẩy lên khi máy chủ chưa bị đổi từ lần đồng bộ cuối
   if (!DB || !USER || canPush) return;
   try {
-    const doc = await uref().get(), ts = doc.exists ? (doc.data().updated_at || 0) : 0;
+    const c = await getDoc(), ts = c ? c.ts : 0;
     if (ts <= (+localStorage[KEY + '_s'] || 0)) { canPush = true; dirty = true; push(); } else sync('Máy chủ có dữ liệu mới hơn, hãy đăng xuất rồi đăng nhập lại để tải về');
-  } catch (e) {}
+  } catch (e) { sync(cloudErr(e)); }
 }
 addEventListener('online', () => { push(); reconnect(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { clearTimeout(svT); push(); } });
@@ -113,7 +143,7 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => go(b.data
 const T = {};
 T.profile = () => {
   const p = Object.assign({ bud: 'mid', cap: '' }, D.p || { sex: 'm', age: 21, h: 170, w: 65, fat: '', job: 0, n: 4, exp: 0, eq: 'gym', goal: 'lean', allergy: '', injury: '', time: '18:00' });
-  V.innerHTML = `${acctBar()}${backupBar()}<h2>Hồ sơ của bạn</h2><div class=card>
+  V.innerHTML = `${acctBar()}${D.p || !DB ? '' : '<div class=card><b>Chào mừng bạn!</b><p class=mut style="margin:4px 0 0">Điền hồ sơ bên dưới rồi bấm lưu, app sẽ tạo lịch tập, thực đơn và nhật ký riêng cho bạn. Lần sau mở app, bạn tự vào đúng tài khoản này.</p></div>'}${backupBar()}<h2>Hồ sơ của bạn</h2><div class=card>
   <div class=r2><div><label>Giới tính</label><select id=sex><option value=m>Nam<option value=f>Nữ</select></div>
   <div><label>Tuổi</label><input id=age type=number></div>
   <div><label>Chiều cao (cm)</label><input id=h type=number></div><div><label>Cân nặng (kg)</label><input id=w type=number step=.1></div></div>
@@ -536,14 +566,13 @@ T.log = () => {
   w.forEach((x, i) => { const X = 20 + i * 560 / (w.length - 1), Y = 140 - (x.kg - mn) / (mx - mn) * 120; i ? c.lineTo(X, Y) : c.moveTo(X, Y); }); c.stroke();
   c.fillStyle = '#aaa'; c.font = '14px sans-serif'; c.fillText(mx.toFixed(1), 2, 14); c.fillText(mn.toFixed(1), 2, 158);
 };
-// ---------------- Đăng nhập (email + mật khẩu; trên web có thêm Google) ----------------
+// ---------------- Đăng nhập bằng tên đăng nhập + mật khẩu ----------------
 const FAKE = '@gymcoach.example.com'; // tên đăng nhập được đổi thành email nội bộ (không gửi thư tới đây); ai nhập email thật thì dùng email thật
 const toEmail = v => { v = v.trim().toLowerCase(); return v.includes('@') ? v : v + FAKE; };
 const shownName = u => u.email && u.email.endsWith(FAKE) ? u.email.slice(0, -FAKE.length) : u.email;
+const normUser = v => { v = v.trim().toLowerCase(); return v.includes('@') ? v : v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/\s+/g, '').replace(/[^a-z0-9._-]/g, ''); };
 const validLogin = v => v.includes('@') ? /^\S+@\S+\.\S+$/.test(v) : /^[a-z0-9._-]{3,20}$/.test(v);
-const isNative = () => !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
-const isStandalone = () => !!(navigator.standalone || (matchMedia && matchMedia('(display-mode: standalone)').matches));
-const acctBar = () => DB && USER ? `<div class=card><div style="display:flex;gap:10px;align-items:center;justify-content:space-between"><div><div class=mut>Tài khoản</div><b>${shownName(USER)}</b><div class=mut id=sync>${st8 || 'Đã đồng bộ'}</div></div><button class=g style="width:auto;margin:0" onclick="logout()">Đăng xuất</button></div><details style="margin-top:8px"><summary class=mut>Đổi mật khẩu</summary><label>Mật khẩu hiện tại</label><input id=op type=password autocomplete=current-password><label>Mật khẩu mới (từ 6 ký tự)</label><input id=np type=password autocomplete=new-password><button class=g onclick="changePw()">Đổi mật khẩu</button><p class=warn id=pwm></p></details></div>` : '';
+const acctBar = () => DB && USER ? `<div class=card><div style="display:flex;gap:10px;align-items:center;justify-content:space-between"><div><div class=mut>Tài khoản</div><b>${shownName(USER)}</b><div class=mut id=sync style="cursor:pointer" onclick="reconnect();push()">${st8 || 'Đã đồng bộ'}</div></div><button class=g style="width:auto;margin:0" onclick="logout()">Đăng xuất</button></div><details style="margin-top:8px"><summary class=mut>Đổi mật khẩu</summary><label>Mật khẩu hiện tại</label><input id=op type=password autocomplete=current-password><label>Mật khẩu mới (từ 6 ký tự)</label><input id=np type=password autocomplete=new-password><button class=g onclick="changePw()">Đổi mật khẩu</button><p class=warn id=pwm></p></details></div>` : '';
 const backupBar = () => `<div class=card><h3>Sao lưu dữ liệu</h3><div class=r2><button class=g onclick="exportData()">Sao chép bản sao lưu</button><button class=g onclick="importData()">Khôi phục từ bản sao lưu</button></div><textarea id=bk rows=3 placeholder="Dán bản sao lưu vào đây để khôi phục" style="width:100%;margin-top:8px"></textarea><p class=mut id=bkm style="margin:6px 0 0"></p></div>`;
 async function exportData() {
   const t = JSON.stringify(D);
@@ -560,51 +589,59 @@ function importData() {
 function authUI(html) { let a = $('#auth'); if (!a) { a = document.createElement('div'); a.id = 'auth'; document.body.appendChild(a); } a.innerHTML = `<div class=box>${html}</div>`; }
 function showLogin(msg = '') {
   stopCam(); closeDemo();
-  authUI(`<h2>Đăng nhập Gym Coach</h2><div class=card><p class=mut style="margin:0 0 6px">Mỗi người tự đặt tên đăng nhập và mật khẩu riêng. Dữ liệu thể trạng, kế hoạch, nhật ký và rep mẫu chỉ mình bạn xem được và được giữ lại cho lần mở sau.</p>
-  <label>Tên đăng nhập</label><input id=em autocomplete=username autocapitalize=none autocorrect=off spellcheck=false placeholder="ví dụ: nguyenvana" value="${LASTEM}">
+  const last = LASTEM || (() => { try { return localStorage.gym_last || ''; } catch (e) { return ''; } })();
+  authUI(`<h2>Đăng nhập Gym Coach</h2><div class=card><p class=mut style="margin:0 0 6px">Chưa có tài khoản? Tự đặt một tên đăng nhập và mật khẩu rồi bấm <b>Tạo tài khoản mới</b>. Mỗi người có tài khoản và lịch tập riêng, lần sau mở app sẽ tự vào, không cần nhập lại.</p>
+  <label>Tên đăng nhập</label><input id=em autocomplete=username autocapitalize=none autocorrect=off spellcheck=false placeholder="ví dụ: nguyenvana" value="${last}">
   <label>Mật khẩu (từ 6 ký tự)</label><input id=pw type=password autocomplete=current-password>
-  <button onclick="emailLogin(false)">Đăng nhập</button><button class=g onclick="emailLogin(true)">Tạo tài khoản mới</button>
-  <p class=warn id=am>${msg}</p>
-  <p class=mut>Tên đăng nhập gồm 3 đến 20 ký tự: chữ thường không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang. Hãy ghi nhớ mật khẩu, vì tài khoản dạng tên đăng nhập không có email để lấy lại. Nếu muốn có chức năng quên mật khẩu, hãy nhập email thật vào ô tên đăng nhập khi tạo tài khoản.</p>
+  <p class=warn id=am style="font-weight:600;margin:8px 0 0">${msg}</p>
+  <button id=b1 onclick="emailLogin(false)">Đăng nhập</button><button id=b2 class=g onclick="emailLogin(true)">Tạo tài khoản mới</button>
+  <p class=mut>Tên đăng nhập gồm 3 đến 20 ký tự; app tự bỏ dấu và khoảng trắng (ví dụ "Nguyễn Văn Bảo" thành "nguyenvanbao"). Hãy ghi nhớ mật khẩu, vì tài khoản dạng tên đăng nhập không có email để lấy lại. Muốn có chức năng quên mật khẩu, hãy nhập email thật vào ô tên đăng nhập khi tạo tài khoản.</p>
   <button class=g onclick="resetPw()">Quên mật khẩu (chỉ với tài khoản dùng email thật)</button></div>`);
 }
-const authErr = e => ({ 'auth/invalid-credential': 'Sai tên đăng nhập hoặc mật khẩu.', 'auth/wrong-password': 'Sai tên đăng nhập hoặc mật khẩu.', 'auth/user-not-found': 'Tên đăng nhập này chưa có tài khoản, hãy bấm Tạo tài khoản mới.', 'auth/requires-recent-login': 'Hãy đăng xuất, đăng nhập lại rồi thử đổi mật khẩu.',
-  'auth/email-already-in-use': 'Tên đăng nhập này đã có người dùng, hãy chọn tên khác hoặc bấm Đăng nhập.', 'auth/weak-password': 'Mật khẩu quá yếu, cần từ 6 ký tự.', 'auth/invalid-email': 'Tên đăng nhập hoặc email chưa đúng.',
-  'auth/network-request-failed': 'Không có mạng, hãy thử lại khi có kết nối.', 'auth/too-many-requests': 'Thử quá nhiều lần, chờ một lúc rồi thử lại.',
-  'auth/operation-not-allowed': 'Chưa bật phương thức đăng nhập này trong Firebase (Authentication, Sign-in method).', 'auth/popup-closed-by-user': 'Bạn đã đóng cửa sổ đăng nhập.',
-  'auth/unauthorized-domain': 'Tên miền này chưa được cho phép trong Firebase (Authentication, Settings, Authorized domains).', 'auth/popup-blocked': 'Trình duyệt chặn cửa sổ đăng nhập, hãy cho phép rồi thử lại.' })[e.code] || 'Lỗi: ' + e.message;
+const authErr = e => ({ INVALID_LOGIN_CREDENTIALS: 'Sai tên đăng nhập hoặc mật khẩu.', INVALID_PASSWORD: 'Sai tên đăng nhập hoặc mật khẩu.', EMAIL_NOT_FOUND: 'Tên đăng nhập này chưa có tài khoản, hãy bấm Tạo tài khoản mới.',
+  EMAIL_EXISTS: 'Tên đăng nhập này đã có người dùng, hãy chọn tên khác hoặc bấm Đăng nhập.', WEAK_PASSWORD: 'Mật khẩu quá yếu, cần từ 6 ký tự.', INVALID_EMAIL: 'Tên đăng nhập hoặc email chưa đúng.',
+  TOO_MANY_ATTEMPTS_TRY_LATER: 'Thử quá nhiều lần, chờ một lúc rồi thử lại.', USER_DISABLED: 'Tài khoản này đã bị khóa.',
+  OPERATION_NOT_ALLOWED: 'Firebase chưa bật đăng nhập Email/Password: vào Authentication, Sign-in method, bật Email/Password.',
+  ADMIN_ONLY_OPERATION: 'Firebase đang tắt việc tạo tài khoản mới: vào Authentication, Settings, User actions, bật Enable create (sign-up).',
+  CONFIGURATION_NOT_FOUND: 'Firebase Authentication chưa được bật: vào Authentication và bấm Get started.',
+  API_KEY_INVALID: 'apiKey trong firebase-config.js chưa đúng.', PERMISSION_DENIED: 'Firebase từ chối yêu cầu: kiểm tra apiKey và việc đã bật Authentication chưa.',
+  network: 'Không kết nối được máy chủ đăng nhập, kiểm tra mạng rồi thử lại.', timeout: 'Máy chủ không phản hồi, kiểm tra mạng rồi thử lại.' })[e && e.code] || 'Lỗi: ' + (e && (e.message || e.code) || 'không rõ');
 async function emailLogin(create) {
-  const raw = $('#em').value.trim().toLowerCase(), pw = $('#pw').value, m = $('#am');
-  if (!validLogin(raw)) { m.textContent = 'Tên đăng nhập gồm 3 đến 20 ký tự: chữ thường không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang (hoặc nhập một email hợp lệ).'; return; }
+  const raw = normUser($('#em').value), pw = $('#pw').value, m = $('#am'), btn = $(create ? '#b2' : '#b1'), txt = btn.textContent; $('#em').value = raw;
+  if (!validLogin(raw)) { m.textContent = 'Tên đăng nhập cần từ 3 đến 20 ký tự (chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang). Khoảng trắng và dấu sẽ tự được bỏ. Hoặc nhập một email hợp lệ.'; return; }
   if (pw.length < 6) { m.textContent = 'Mật khẩu cần từ 6 ký tự.'; return; }
-  LASTEM = raw; m.textContent = 'Đang xử lý…'; const em = toEmail(raw);
-  try { create ? await AUTH.createUserWithEmailAndPassword(em, pw) : await AUTH.signInWithEmailAndPassword(em, pw); } // xong thì onAuthStateChanged xử lý tiếp
-  catch (e) { m.textContent = authErr(e); }
+  LASTEM = raw; m.textContent = ''; btn.disabled = true; btn.textContent = 'Đang xử lý…'; const em = toEmail(raw);
+  try {
+    const j = await authCall(create ? 'signUp' : 'signInWithPassword', { email: em, password: pw, returnSecureToken: true });
+    setSess(j); SESS.email = em; saveSess(); try { localStorage.gym_last = raw; } catch (e) {}
+    await afterLogin({ uid: SESS.uid, email: em });
+  } catch (e) { m.textContent = authErr(e); btn.disabled = false; btn.textContent = txt; }
 }
 async function resetPw() {
-  const raw = $('#em').value.trim().toLowerCase(), m = $('#am');
+  const raw = normUser($('#em').value), m = $('#am');
   if (!raw.includes('@')) { m.textContent = 'Tài khoản dạng tên đăng nhập không đặt lại được qua email. Chỉ tài khoản tạo bằng email thật mới có chức năng này.'; return; }
-  try { await AUTH.sendPasswordResetEmail(raw); m.textContent = 'Nếu email này có tài khoản, thư đặt lại mật khẩu đã được gửi, kiểm tra cả mục Spam.'; } catch (e) { m.textContent = authErr(e); }
+  try { await authCall('sendOobCode', { requestType: 'PASSWORD_RESET', email: raw }); m.textContent = 'Nếu email này có tài khoản, thư đặt lại mật khẩu đã được gửi, kiểm tra cả mục Spam.'; } catch (e) { m.textContent = authErr(e); }
 }
 async function changePw() {
   const op = $('#op').value, np = $('#np').value, m = $('#pwm');
   if (np.length < 6) { m.textContent = 'Mật khẩu mới cần từ 6 ký tự.'; return; }
-  try { await USER.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(USER.email, op)); await USER.updatePassword(np); m.textContent = 'Đã đổi mật khẩu.'; $('#op').value = ''; $('#np').value = ''; }
-  catch (e) { m.textContent = authErr(e); }
+  try {
+    await authCall('signInWithPassword', { email: USER.email, password: op, returnSecureToken: true }); // xác nhận mật khẩu hiện tại
+    const j = await authCall('update', { idToken: await token(), password: np, returnSecureToken: true });
+    setSess(j); SESS.email = USER.email; saveSess(); m.textContent = 'Đã đổi mật khẩu.'; $('#op').value = ''; $('#np').value = '';
+  } catch (e) { m.textContent = authErr(e); }
 }
-async function googleLogin() {
-  const m = $('#am'); m.textContent = 'Đang mở cửa sổ đăng nhập…';
-  try { await AUTH.signInWithPopup(new firebase.auth.GoogleAuthProvider()); } catch (e) { m.textContent = authErr(e); }
-}
+const DEAD = ['TOKEN_EXPIRED', 'USER_NOT_FOUND', 'USER_DISABLED', 'INVALID_REFRESH_TOKEN', 'INVALID_GRANT_TYPE', 'UNAUTHENTICATED', 'CREDENTIAL_TOO_OLD_LOGIN_AGAIN', 'MISSING_REFRESH_TOKEN'];
+function dropSession(msg) { SESS = null; try { localStorage.removeItem('gym_sess'); } catch (e) {} USER = null; KEY = 'gym'; dirty = false; canPush = false; D = norm({}); showLogin(msg); }
 async function afterLogin(u) {
   USER = u; KEY = 'gym_' + u.uid; authUI('<p class=mut style="text-align:center;margin-top:35vh">Đang tải dữ liệu của bạn…</p>');
   let loc = null; try { loc = JSON.parse(localStorage[KEY] || 'null'); } catch (e) {}
-  let doc = null, err = false;
-  try { doc = await uref().get(); } catch (e) { err = true; }
+  let cloud = null, err = false, cerr = null;
+  try { cloud = await getDoc(); } catch (e) { err = true; cerr = e; }
+  if (err && DEAD.includes(cerr.code)) return dropSession('Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.');
   canPush = !err;
-  const cd = doc && doc.exists ? doc.data() : null, cloud = cd && cd.json ? { json: cd.json, ts: cd.updated_at || 0 } : null;
   const pk = pickData(cloud, loc, { dirty: localStorage[KEY + '_d'] == '1', lastSync: +localStorage[KEY + '_s'] || 0 });
-  if (err) { D = norm(loc); st8 = 'Chưa kết nối được máy chủ, đang dùng bản lưu trên máy'; }
+  if (err) { D = norm(loc); st8 = cloudErr(cerr) + ' (đang dùng bản lưu trên máy, chạm dòng trạng thái ở tab Hồ sơ để thử lại)'; }
   else if (pk.src == 'cloud') {
     try { if (pk.conflict) localStorage[KEY + '_conflict'] = JSON.stringify(loc); D = norm(JSON.parse(cloud.json)); localStorage[KEY + '_s'] = cloud.ts; localStorage.removeItem(KEY + '_d'); }
     catch (e) { D = norm(loc); canPush = false; st8 = 'Dữ liệu trên máy chủ bị lỗi, chưa ghi đè'; }
@@ -615,7 +652,7 @@ async function afterLogin(u) {
     D = norm(old && old.p && confirm('Máy này có dữ liệu cũ chưa gắn tài khoản. Chuyển vào tài khoản ' + shownName(u) + '?') ? old : loc);
   }
   if (canPush) { // rep mẫu lưu riêng theo từng người, từng bài
-    try { const r = await uref().collection('ref').get(); if (!r.empty) { D.ref = {}; r.forEach(x => { const v = x.data(); D.ref[x.id] = { min: v.min, max: v.max }; }); } else Object.keys(D.ref).forEach(saveRef); } catch (e) {}
+    try { const r = await listRefs(); if (r.length) { D.ref = {}; r.forEach(x => D.ref[x.id] = { min: x.min, max: x.max }); } else Object.keys(D.ref).forEach(saveRef); } catch (e) {}
   }
   const cache = () => { try { localStorage[KEY] = JSON.stringify(D); } catch (e) {} };
   if (canPush && !(pk.src == 'cloud' && cloud)) { save(); push(); } else cache(); // chỉ ghi lên máy chủ khi dữ liệu trên máy là bản đúng
@@ -624,32 +661,27 @@ async function afterLogin(u) {
 }
 async function saveRef(k) {
   if (!DB || !USER || !canPush || !D.ref[k]) return;
-  try { await uref().collection('ref').doc(k).set({ min: D.ref[k].min, max: D.ref[k].max, updated_at: Date.now() }); sync('Đã lưu rep mẫu'); }
-  catch (e) { sync('Chưa lưu được rep mẫu lên máy chủ'); }
+  try { await fsCall('/users/' + USER.uid + '/ref/' + encodeURIComponent(k), 'PATCH', { fields: { min: { doubleValue: D.ref[k].min }, max: { doubleValue: D.ref[k].max }, updated_at: { integerValue: String(Date.now()) } } }, '?updateMask.fieldPaths=min&updateMask.fieldPaths=max&updateMask.fieldPaths=updated_at'); sync('Đã lưu rep mẫu'); }
+  catch (e) { sync(cloudErr(e)); }
 }
 async function delRef() {
   const k = $('#ex').value; if (!k || !D.ref[k]) return;
   if (!confirm('Xóa rep mẫu của bài này? App sẽ dùng chuẩn mặc định.')) return;
   delete D.ref[k]; save();
-  if (DB && USER && canPush) { try { await uref().collection('ref').doc(k).delete(); } catch (e) {} }
+  if (DB && USER && canPush) { try { await fsCall('/users/' + USER.uid + '/ref/' + encodeURIComponent(k), 'DELETE'); } catch (e) {} }
   st = null; sm = null; info();
 }
 async function logout() {
+  if (dirty) { clearTimeout(svT); await push(); }
   if (dirty && !confirm('Còn dữ liệu chưa đồng bộ, đăng xuất bây giờ có thể mất. Vẫn đăng xuất?')) return;
   try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + '_d'); localStorage.removeItem(KEY + '_s'); } catch (e) {}
-  USER = null; KEY = 'gym'; dirty = false; canPush = false; D = norm({});
-  await AUTH.signOut(); showLogin();
+  dropSession('');
 }
 function boot() {
-  if (!FB_CONFIG || !window.firebase) { go(D.p ? 'plan' : 'profile'); return; } // chưa cấu hình: chạy chế độ lưu trên máy
-  firebase.initializeApp(FB_CONFIG); AUTH = firebase.auth(); DB = firebase.firestore();
-  let first = true;
-  AUTH.onAuthStateChanged(u => {
-    if (u) { if (!USER || USER.uid != u.uid) afterLogin(u); }
-    else if (USER) { USER = null; KEY = 'gym'; D = norm({}); showLogin('Phiên đăng nhập đã hết, hãy đăng nhập lại.'); }
-    else if (first) showLogin();
-    first = false;
-  });
+  if (!FB_CONFIG) { go(D.p ? 'plan' : 'profile'); return; } // chưa cấu hình: chạy chế độ lưu trên máy
+  DB = true;
+  try { SESS = JSON.parse(localStorage.gym_sess || 'null'); } catch (e) { SESS = null; }
+  if (SESS && SESS.uid) afterLogin({ uid: SESS.uid, email: SESS.email }); else showLogin();
 }
 if ('serviceWorker' in navigator && /^https?:/.test(location.protocol) && location.hostname != 'localhost') navigator.serviceWorker.register('sw.js').catch(() => {}); // chạy cả trên web, iPhone và APK tải trang trực tuyến
 boot();
